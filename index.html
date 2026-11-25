@@ -394,6 +394,7 @@ function vToday(){
   const open=S.notes.filter(n=>!n.done),inbox=open.filter(n=>n.inbox),sorted=open.filter(n=>!n.inbox);
   const beforeLeft=sorted.filter(n=>n.before).length;
   if(isT){const R=reminders();if(R.length)h+=`<h2>Rappels <span class="n">${R.length}</span></h2>`+R.map(r=>`<div class="rem"><div class="body"><b>${esc(r.title)}</b><span>${r.when}</span></div><button class="btn ghost" data-act="seen" data-v="${r.kind}" data-id="${r.id}">Vu</button></div>`).join('')}
+  if(isT&&(now.getDay()===5&&now.getHours()>=12||now.getDay()===6||now.getDay()===0))h+=`<button class="banner" data-act="bilan">Faire le bilan de la semaine</button>`;
   if(M.notes&&inbox.length&&isT)h+=`<button class="banner" data-act="view" data-v="todo"><span class="n">${inbox.length}</span> note${inbox.length>1?'s':''} à trier</button>`;
   if(M.agenda){
     const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -566,6 +567,15 @@ function renderSheet(){
     ${noteForm(d)}
     <div style="display:flex;gap:10px;margin-top:18px">${isNew?'<button class="btn ghost" data-act="close">Annuler</button>':'<button class="btn danger" data-act="delNote" data-id="'+d.id+'">Supprimer</button>'}<button class="btn block" data-act="saveNote">${isNew?'Enregistrer':(d.inbox?'Ranger':'Enregistrer')}</button></div>
     ${isNew?'':`<button class="btn ghost block" style="margin-top:10px" data-act="doneNote" data-id="${d.id}">${d.done?'Remettre à faire':'C’est fait'}</button>`}`;
+  }else if(sheet.type==='bilan'){
+    const now=new Date(),dow=(now.getDay()+6)%7,nm=addDays(now,7-dow),ne=addDays(nm,6),a=ymd(nm),b=ymd(ne);
+    const left=S.notes.filter(n=>!n.done&&!n.inbox),ev=S.events.filter(e=>e.date>=a&&e.date<=b).sort((x,y)=>x.date.localeCompare(y.date)||(x.time||'').localeCompare(y.time||''));
+    const pup=S.pupils.map(p=>({p,c:left.filter(n=>n.pupilId===p.id).length+ev.filter(e=>e.pupilId===p.id).length})).filter(x=>x.c);
+    body=`<div class="grab"></div><h3>Bilan de la semaine</h3>
+    <h2>Encore à faire <span class="n">${left.length}</span></h2>${left.length?left.map(n=>itemRow(n)).join(''):'<div class="empty">Tout est fait. Bon week-end !</div>'}
+    <h2>Semaine prochaine <span class="n">${ev.length}</span></h2>${ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Rien de prévu pour l’instant.</div>'}
+    ${pup.length?'<h2>Élèves à suivre</h2>'+card(pup.map(x=>`<div class="setrow"><button class="main" data-act="pupil" data-id="${x.p.id}"><b>${esc(x.p.name)}</b><small>${x.c} à venir</small></button></div>`).join('')):''}
+    <div style="display:flex;gap:10px;margin-top:18px"><button class="btn ghost" data-act="close">Fermer</button>${left.some(n=>n.due&&n.due<ymd(nm))?'<button class="btn" data-act="reportMon">Reporter les retards à lundi</button>':''}</div>`;
   }else if(sheet.type==='search'){
     body=`<div class="grab"></div><h3>Rechercher</h3><div class="search">${ICONS.search}<input id="gq" type="search" placeholder="Une tâche, un événement, un élève…" autocomplete="off" value="${esc(sheet.q||'')}"></div><div id="gres">${resHTML((sheet.q||'').trim())}</div><button class="btn ghost block" style="margin-top:14px" data-act="close">Fermer</button>`;
   }else if(sheet.type==='photo'){
@@ -632,6 +642,8 @@ const ACT={
   day:v=>{agSel=v;const x=fromYmd(v);agMonth=new Date(x.getFullYear(),x.getMonth(),1);render()},
   shift:v=>{agSel=ymd(addDays(fromYmd(agSel),+v));render()},
   mshift:v=>{agMonth=new Date(agMonth.getFullYear(),agMonth.getMonth()+ +v,1);render()},
+  bilan:()=>openSheet({type:'bilan'}),
+  reportMon:()=>{const now=new Date(),nm=ymd(addDays(now,7-((now.getDay()+6)%7)));S.notes.forEach(n=>{if(!n.done&&!n.inbox&&n.due&&n.due<nm)n.due=nm});persist();toast('Retards reportés à lundi');closeSheet()},
   capture:()=>{openSheet({type:'note',d:newDraft()});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
   openNote:(v,id)=>{
     const n=S.notes.find(x=>x.id===id);if(!n)return;
@@ -736,7 +748,7 @@ function doCopy(id,share){
   if(share&&navigator.share){navigator.share({text:txt}).catch(()=>{});return}
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copié')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copié')}catch(e){toast('Copie impossible')}ta.remove()});
 }
-const MUT=new Set(['setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
+const MUT=new Set(['reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
 function closeSw(){if(swOpen){swOpen.classList.remove('open');const i=swOpen.lastElementChild;if(i)i.style.transform='';swOpen=null}}
 (function(){

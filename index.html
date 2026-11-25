@@ -152,6 +152,7 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .soon{opacity:.55}
 .badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--muted)}
 .link{color:var(--accent);font-weight:700;text-decoration:underline;padding:6px 0}
+.bday{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 10px;border-radius:14px;background:color-mix(in srgb,#F06595 13%,var(--surface));border:1px solid color-mix(in srgb,#F06595 40%,var(--line))}.bday .cake{font-size:26px;line-height:1}.bday .body{display:flex;flex-direction:column}.bday span:not(.cake){font-size:13px;color:var(--muted)}
 .rem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,#E5A100 14%,var(--surface));border:1px solid color-mix(in srgb,#E5A100 40%,var(--line));margin-bottom:8px}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
 .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.gal button{aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--soft)}.gal img{width:100%;height:100%;object-fit:cover;display:block}
@@ -393,9 +394,9 @@ function vToday(){
   }
   const open=S.notes.filter(n=>!n.done),inbox=open.filter(n=>n.inbox),sorted=open.filter(n=>!n.inbox);
   const beforeLeft=sorted.filter(n=>n.before).length;
+  S.pupils.filter(p=>p.birth&&p.birth.slice(-5)===tDay.slice(5)).forEach(p=>{h+=`<div class="bday"><span class="cake">🎂</span><div class="body"><b>Anniversaire de ${esc(p.name)}</b>${p.birth.length===10?'<span>'+agoYears(p.birth,tDay)+' ans</span>':''}</div></div>`});
   if(isT){const R=reminders();if(R.length)h+=`<h2>Rappels <span class="n">${R.length}</span></h2>`+R.map(r=>`<div class="rem"><div class="body"><b>${esc(r.title)}</b><span>${r.when}</span></div><button class="btn ghost" data-act="seen" data-v="${r.kind}" data-id="${r.id}">Vu</button></div>`).join('')}
   if(isT&&(now.getDay()===5&&now.getHours()>=12||now.getDay()===6||now.getDay()===0))h+=`<button class="banner" data-act="bilan">Faire le bilan de la semaine</button>`;
-  if(isT){const md=k=>ymd(k).slice(5);[0,1,2].forEach(i=>{const m=md(addDays(now,i));S.pupils.filter(p=>p.birth===m).forEach(p=>{h+=`<div class="rem"><div class="body"><b>Anniversaire de ${esc(p.name)}</b><span>${i===0?'aujourd’hui':i===1?'demain':'dans 2 jours'}</span></div></div>`})})}
   if(M.notes&&inbox.length&&isT)h+=`<button class="banner" data-act="view" data-v="todo"><span class="n">${inbox.length}</span> note${inbox.length>1?'s':''} à trier</button>`;
   if(M.agenda){
     const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -599,17 +600,27 @@ function renderSheet(){
     const past=e=>e.date<td||(e.date===td&&e.time&&e.time<hm);
     const allEv=S.events.filter(e=>e.pupilId===p.id).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
     const evs=allEv.filter(e=>!past(e)),pastEv=allEv.filter(past).reverse();
-    const row=x=>{const d=new Date(x.ts),ln=x.noteId?S.notes.find(q=>q.id===x.noteId):null;return `<div class="item ${ln&&ln.done?'done':''}" style="--c:${ln?colorOf(ln):NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${ln?dueLabel(ln)+(ln.done?'<span class="pill plain">fait</span>':''):''}</div></div></div>`};
-    const isDone=x=>{const ln=x.noteId&&S.notes.find(q=>q.id===x.noteId);return !!(ln&&ln.done)};
-    const act=p.notes.filter(x=>!isDone(x)),doneN=p.notes.filter(isDone).reverse(),nHist=pastEv.length+doneN.length;
-    body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 6px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Anniversaire</label><input id="pb" type="date" data-pid="${p.id}" value="${p.birth?'2000-'+p.birth:''}" style="flex:1"></div>${evs.length?`<h2 style="margin:14px 0 8px">Événements <span class="n">${evs.length}</span></h2>`+evs.map(e=>eventCard(e)).join(''):''}${pn?'<p class="sub">Notes de suivi</p>':''}
-    ${pn?(act.length?act.slice().reverse().map(row).join(''):'<div class="empty">Pas encore de note.</div>'):''}
-    ${pn?`<div class="field"><label for="pn">Ajouter une note</label><textarea id="pn" style="min-height:80px" placeholder="Ex. a oublié son cahier, rendez-vous à prévoir…">${esc(f.text)}</textarea></div>
-    <div class="field"><label>À faire pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div>
-    <div style="margin-top:10px"><label for="pd" style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Ou avant une date précise</label><input id="pd" type="date" value="${f.date||''}"></div>
-    <p class="hint">Avec une date, la note apparaît aussi dans « À faire » et dans l’agenda.</p></div>`:''}
-    ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneN.map(row).join(''):''}`:''}
-    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button>${pn?'<button class="btn ghost" data-act="close">Fermer</button><button class="btn block" data-act="savePupilNote" data-id="'+p.id+'">Enregistrer la note</button>':'<button class="btn block" data-act="close">Fermer</button>'}</div>`;
+    const mine=S.notes.filter(n=>n.pupilId===p.id);
+    const todo=mine.filter(n=>!n.done).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')),doneT=mine.filter(n=>n.done);
+    const obs=p.notes.filter(x=>!x.noteId).slice().reverse();
+    const nHist=pastEv.length+doneT.length;
+    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
+    const sec=(t,n,c)=>`<h2 style="margin:16px 0 8px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></i>${t} <span class="n">${n}</span></h2>`;
+    const ty=f.type||'note';
+    const lab={note:['Note','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
+    const lb='display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
+    const age=p.birth&&p.birth.length===10?`<span style="color:var(--muted);font-size:14px">${agoYears(p.birth)} ans</span>`:'';
+    body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Né(e) le</label><input id="pb" type="date" data-pid="${p.id}" value="${p.birth&&p.birth.length===10?p.birth:''}" style="flex:1">${age}</div>
+    ${sec('À faire',todo.length,'#E8590C')}${todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Rien à faire pour cet élève.</div>'}
+    ${sec('Événements',evs.length,'#1C7ED6')}${evs.length?evs.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement à venir.</div>'}
+    ${pn?sec('Notes',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore de note.</div>'):''}
+    <div class="field" style="margin-top:20px"><label style="${lb}">Ajouter</label><div class="chips">${Object.keys(lab).map(k=>`<button class="chip ${ty===k?'on':''}" data-act="ptype" data-v="${k}">${lab[k][0]}</button>`).join('')}</div></div>
+    <div class="field"><textarea id="pn" style="min-height:76px" placeholder="${lab[ty][1]}">${esc(f.text)}</textarea></div>
+    ${ty==='todo'?`<div class="field"><label style="${lb}">Pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div><div style="margin-top:10px"><label for="pd" style="${lb}">Ou une date précise</label><input id="pd" type="date" value="${f.date||''}"></div></div>`:''}
+    ${ty==='event'?`<div class="field"><label for="pd" style="${lb}">Date</label><input id="pd" type="date" value="${f.date||''}"></div><div class="field"><label for="pt" style="${lb}">Heure (facultatif)</label><input id="pt" type="time" value="${f.time||''}"></div>`:''}
+    <button class="btn block" data-act="savePupilNote" data-id="${p.id}">Enregistrer</button>
+    ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneT.map(n=>itemRow(n)).join(''):''}`:''}
+    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button><button class="btn ghost block" data-act="close">Fermer</button></div>`;
   }else if(sheet.type==='tpl'){
     const t=sheet.d;
     body=`<div class="grab"></div><h3>${t.id?'Modifier le modèle':'Nouveau modèle'}</h3>
@@ -627,7 +638,8 @@ function readNote(){
   const n=$('#nd');if(n){sheet.d.date=n.value;if(n.value)sheet.d.when=''}
   const h=$('#nh');if(h)sheet.d.time=h.value;
 }
-function readPupil(){if(!sheet||sheet.type!=='pupil')return;const t=$('#pn');if(t)sheet.f.text=t.value;const d=$('#pd');if(d){sheet.f.date=d.value;if(d.value)sheet.f.when=''}}
+function readPupil(){if(!sheet||sheet.type!=='pupil')return;const t=$('#pn');if(t)sheet.f.text=t.value;const d=$('#pd');if(d){sheet.f.date=d.value;if(d.value&&sheet.f.type==='todo')sheet.f.when=''}const tm=$('#pt');if(tm)sheet.f.time=tm.value}
+function agoYears(b,at){const y=+b.slice(0,4),d=at?fromYmd(at):new Date(),a=d.getFullYear()-y;return a}
 function resizeImage(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const m=900,s=Math.min(1,m/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.7))};im.src=r.result};r.readAsDataURL(file)})}
 function weeklyCopies(ev,n){for(let i=1;i<=n;i++)S.events.push({...ev,id:uid(),date:ymd(addDays(fromYmd(ev.date),7*i))})}
 function icsOf(e,rep){
@@ -730,16 +742,18 @@ const ACT={
     if(e.id){const i=S.events.findIndex(x=>x.id===e.id);S.events[i]={...e}}else{const ne={...e,id:uid()};delete ne.repeat;S.events.push(ne);if(e.repeat)weeklyCopies(ne,9)}
     agSel=e.date;persist();sheet=null;render();toast('Ajouté à l’agenda')},
   delEvent:()=>{S.events=S.events.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()},
-  pupil:(v,id)=>openSheet({type:'pupil',id,f:{text:'',when:'',date:''}}),
+  pupil:(v,id)=>openSheet({type:'pupil',id,f:{type:'note',text:'',when:'',date:'',time:''}}),
   pwhen:v=>{readPupil();sheet.f.when=v;sheet.f.date='';renderSheet()},
-  addPupil:()=>{const i=$('#np'),v=i.value.trim(),b=$('#nb');if(v){S.pupils.push({id:uid(),name:v,notes:[],birth:b&&b.value?b.value.slice(5):''});persist();render()}},
+  addPupil:()=>{const i=$('#np'),v=i.value.trim(),b=$('#nb');if(v){S.pupils.push({id:uid(),name:v,notes:[],birth:b&&b.value?b.value:''});persist();render()}},
   savePupilNote:(v,id)=>{
-    readPupil();const p=pupil(id),f=sheet.f,t=f.text.trim();
-    if(!p||!t){toast('Écris une note d’abord');return}
-    if(f.when||f.date){const n={id:uid(),text:t,tag:'eleve',ts:Date.now(),before:f.when==='before'&&!f.date,done:false,due:f.date?f.date:dueFor(f.when),photo:null,subject:'',pupilId:p.id,inbox:false};S.notes.unshift(n);syncPupil(n);toast('Noté et ajouté à « À faire »')}
+    readPupil();const p=pupil(id),f=sheet.f,t=f.text.trim(),ty=f.type||'note';
+    if(!p||!t){toast('Écris quelques mots d’abord');return}
+    if(ty==='event'){if(!f.date){toast('Choisis une date');return}S.events.push({id:uid(),title:t,pupilId:p.id,date:f.date,time:f.time||'',kind:'rdv',remind:''});toast('Ajouté à l’agenda')}
+    else if(ty==='todo'){const n={id:uid(),text:t,tag:'eleve',ts:Date.now(),before:false,done:false,due:f.date?f.date:dueFor(f.when),photo:null,subject:'',pupilId:p.id,inbox:false};S.notes.unshift(n);syncPupil(n);toast('Ajouté à « À faire »')}
     else{p.notes.push({ts:Date.now(),text:t});toast('Note enregistrée')}
-    sheet.f={text:'',when:'',date:''};persist();renderSheet();render();
+    sheet.f={type:ty,text:'',when:'',date:'',time:''};persist();renderSheet();render();
   },
+  ptype:v=>{readPupil();sheet.f.type=v;sheet.f.date='';sheet.f.when='';renderSheet()},
   delPupil:(v,id)=>{S.pupils=S.pupils.filter(x=>x.id!==id);S.notes.forEach(n=>{if(n.pupilId===id)n.pupilId=''});S.events.forEach(e=>{if(e.pupilId===id)e.pupilId=''});persist();sheet=null;render()},
   copy:(v,id)=>doCopy(id,false),share:(v,id)=>doCopy(id,true),
   editTpl:(v,id)=>{const t=S.templates.find(x=>x.id===id);if(t)openSheet({type:'tpl',d:{...t}})},
@@ -802,7 +816,7 @@ document.addEventListener('input',ev=>{
   else if(t.dataset&&t.dataset.sname){const s=subj(t.dataset.sname);if(s){s.name=t.value;persist()}}
 });
 document.addEventListener('change',ev=>{
-  const b=ev.target;if(b&&b.id==='pb'){const p=pupil(b.dataset.pid);if(p){hist.push(JSON.stringify(S));redo=[];p.birth=b.value?b.value.slice(5):'';persist();render()}}
+  const b=ev.target;if(b&&b.id==='pb'){const p=pupil(b.dataset.pid);if(p){hist.push(JSON.stringify(S));redo=[];p.birth=b.value||'';persist();renderSheet();render()}}
 });
 document.addEventListener('change',async ev=>{
   if(ev.target.id==='ph'&&ev.target.files[0]){

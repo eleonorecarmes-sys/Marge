@@ -107,6 +107,7 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .scrim{position:fixed;inset:0;background:rgba(10,12,20,.45);z-index:30;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;max-height:92dvh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom))}
 .sheet h3{font-size:22px;margin:0 0 4px}
+.okwrap{position:sticky;top:0;height:0;z-index:8;display:flex;justify-content:flex-end}.okfab{width:46px;height:46px;margin-top:-6px;border-radius:50%;background:var(--accent);display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.25)}.okfab svg{width:24px;height:24px;stroke:#fff}.sheet h3,.okwrap~p.hint{padding-right:54px}
 .grab{width:42px;height:5px;border-radius:9px;background:var(--line);margin:-6px auto 12px}
 .field{margin:14px 0 0}.field>label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:0 2px 6px;text-transform:uppercase;letter-spacing:.5px}
 .field label.btn{display:flex;text-transform:none;font-size:16px;letter-spacing:0;color:var(--ink);margin:0;font-weight:600}
@@ -301,7 +302,7 @@ function seed(){
 }
 let S=load()||seed();
 const ACCENTS=[['marine','Marine','#1b3a6b','#8fb2ee'],['bleu','Bleu','#1f5fbf','#7fb0f5'],['sapin','Vert sapin','#1f6f5c','#5fc2a5'],['prune','Prune','#6a3b6e','#c79bd0'],['bordeaux','Bordeaux','#8a2f3f','#e59aa6'],['ardoise','Ardoise','#3c4658','#aab6cc']];
-const DEF_SET={accent:'marine',theme:'light',editTemplates:true,modules:{agenda:true,notes:true,class:true,msgs:false,ideas:true,res:true,rec:true,avant:true,photos:true,pupilNotes:true}};
+const DEF_SET={accent:'marine',theme:'light',editTemplates:true,modules:{agenda:true,notes:true,class:true,msgs:false,ideas:true,infos:true,res:true,rec:true,avant:true,photos:true,pupilNotes:true}};
 const TEMPLATES=[
  ['Absence d’un élève','Bonjour,\n\nJe vous remercie de m’avoir prévenue de l’absence de {prénom}. Je lui ferai passer le travail vu en classe dès son retour.\n\nCordialement,'],
  ['Demande de rendez-vous','Bonjour,\n\nJe souhaiterais vous rencontrer au sujet de {prénom}. Seriez-vous disponible cette semaine, par exemple après la classe ?\n\nCordialement,'],
@@ -315,7 +316,7 @@ function ensure(){
   if(!S.templates)S.templates=TEMPLATES.map(t=>({id:uid(),title:t[0],text:t[1]}));
   if(!S.subjects)S.subjects=DEF_SUBJECTS.map(x=>({...x}));
   S.notes.forEach(n=>{if(n.subject===undefined)n.subject='';if(n.pupilId===undefined)n.pupilId='';if(n.inbox===undefined)n.inbox=false;n.before=false});
-  if(!S.recurring)S.recurring=[];if(typeof S.ideas!=='string')S.ideas='';if(!S.ideaList){S.ideaList=S.ideas.split('\n').map(x=>x.replace(/^\s*[•\-]\s*/,'').trim()).filter(Boolean).map((t,i)=>({id:uid(),text:t,ts:Date.now()-i}))}if(!S.res)S.res=[];
+  if(!S.recurring)S.recurring=[];if(typeof S.ideas!=='string')S.ideas='';if(!S.ideaList){S.ideaList=S.ideas.split('\n').map(x=>x.replace(/^\s*[•\-]\s*/,'').trim()).filter(Boolean).map((t,i)=>({id:uid(),text:t,ts:Date.now()-i}))}if(!S.res)S.res=[];if(!S.infoList)S.infoList=[];
   genRecurring();
 }
 function blank(){return {v:2,demo:false,notes:[],events:[],pupils:[],className:S.className||'Ma classe',settings:S.settings,templates:S.templates,subjects:S.subjects,recurring:S.recurring||[]}}
@@ -499,11 +500,12 @@ function vPhotos(){
 }
 function vClass(){
   const M=S.settings.modules;
-  const modes=[];if(M.class)modes.push(['eleves','Élèves']);if(M.ideas)modes.push(['ideas','Idées']);if(M.res)modes.push(['res','Ressources']);if(M.rec)modes.push(['rec','Récurrent']);if(M.photos)modes.push(['photos','Photos']);
+  const modes=[];if(M.class)modes.push(['eleves','Élèves']);if(M.ideas)modes.push(['ideas','Idées']);if(M.infos)modes.push(['infos','Infos']);if(M.res)modes.push(['res','Ressources']);if(M.rec)modes.push(['rec','Récurrent']);
   if(!modes.some(m=>m[0]===classMode))classMode=modes[0]?modes[0][0]:'eleves';
   const seg=modes.length>1?`<div class="seg cseg" style="margin:4px 0 12px">${modes.map(([k,l])=>`<button class="${classMode===k?'on':''}" data-act="cmode" data-v="${k}">${l}</button>`).join('')}</div>`:'';
   if(classMode==='rec')return seg+vRec();
-  if(classMode==='ideas')return seg+vIdeas();
+  if(classMode==='ideas')return seg+vList('idea');
+  if(classMode==='infos')return seg+vList('info');
   if(classMode==='res')return seg+vRes();
   if(classMode==='photos')return seg+vPhotos();
   const pn=M.pupilNotes;
@@ -517,11 +519,12 @@ function vRec(){
   const b=card(S.recurring.map(r=>`<div class="setrow"><div class="main"><b>${esc(r.text)}</b><small>Tous les ${JOURS[r.day]}s</small></div><button class="iconbtn" data-act="delRec" data-id="${r.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow" style="display:block"><input id="rt" placeholder="Ex. Faire l’agenda en ligne" value="${esc(recDraft.text)}" autocomplete="off"><div class="chips" style="margin:10px 0">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${recDraft.day===d?'on':''}" data-act="recday" data-v="${d}">${JOURS[d].slice(0,3)}.</button>`).join('')}</div><button class="btn block" data-act="addRec">Ajouter</button></div>`);
   return `<div class="top"><div><h1>Récurrentes</h1><p class="sub">Des tâches qui reviennent toutes seules chaque semaine dans « À faire ».</p></div>${gear()}</div>`+b;
 }
-function vIdeas(){
-  const L=S.ideaList.slice().sort((a,b)=>b.ts-a.ts);
-  return `<div class="top"><div><h1>Idées</h1><p class="sub">Les idées et propositions de tes élèves.</p></div>${gear()}</div>
-  <div class="field"><textarea id="idn" style="min-height:64px" placeholder="Une idée… puis Entrée pour l’ajouter"></textarea><button class="btn block" style="margin-top:8px" data-act="addIdea">Ajouter</button></div>
-  ${L.length?L.map(x=>{const d=new Date(x.ts);return `<div class="swipe"><button class="swdel" data-act="delIdea" data-id="${x.id}">Supprimer</button><div class="item" style="--c:var(--accent)"><button class="body" data-act="editIdea" data-id="${x.id}"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]}</span></div></button></div></div>`}).join(''):'<div class="empty">Écris une idée et appuie sur Entrée : elle apparaît ici comme une petite carte.</div>'}`;
+const LK=()=>classMode==='infos'?'infoList':'ideaList';
+function vList(kind){
+  const info=kind==='info',L=S[info?'infoList':'ideaList'].slice().sort((a,b)=>b.ts-a.ts);
+  return `<div class="top"><div><h1>${info?'Infos':'Idées'}</h1><p class="sub">${info?'Ce qu’il faut garder sous la main : codes, horaires, contacts…':'Les idées et propositions de tes élèves.'}</p></div>${gear()}</div>
+  <div class="field"><textarea id="idn" style="min-height:64px" placeholder="${info?'Une info… puis Entrée pour l’ajouter':'Une idée… puis Entrée pour l’ajouter'}"></textarea><button class="btn block" style="margin-top:8px" data-act="addIdea">Ajouter</button></div>
+  ${L.length?L.map(x=>{const d=new Date(x.ts);return `<div class="swipe"><button class="swdel" data-act="delIdea" data-id="${x.id}">Supprimer</button><div class="item" style="--c:var(--accent)"><button class="body" data-act="editIdea" data-id="${x.id}"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]}</span></div></button></div></div>`}).join(''):`<div class="empty">${info?'Écris une info et appuie sur Entrée : elle apparaît ici comme une petite carte.':'Écris une idée et appuie sur Entrée : elle apparaît ici comme une petite carte.'}</div>`}`;
 }
 function vRes(){
   const q=norm(qRes.trim());
@@ -560,6 +563,7 @@ function vSettings(){
     mod('class','Classe','La liste des élèves')+
     mod('pupilNotes','Observations par élève','Ce que tu notes sur chaque élève, daté')+
     mod('ideas','Idées','Une zone de texte pour les idées de tes élèves')+
+    mod('infos','Infos','Ce qu’il faut garder sous la main, en petites cartes')+
     mod('res','Ressources','Garder les liens des sites utiles, par matière')+
     mod('rec','Tâches récurrentes','Des tâches qui reviennent chaque semaine')+
     mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))+`<h2>Idées pour plus tard</h2>`+card(soon('Notifications qui sonnent','Des rappels même quand l’appli est fermée')+soon('Synchro entre appareils','Ordinateur, tablette et téléphone')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier'))+'<p class="hint">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>';
@@ -573,12 +577,12 @@ function vSettings(){
 function render(){
   swOpen=null;
   const m=S.settings.modules;
-  if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.ideas&&!m.res&&!m.rec&&!m.photos))view='today';
+  if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.ideas&&!m.infos&&!m.res&&!m.rec))view='today';
   $('#app').innerHTML={today:vToday,agenda:vAgenda,todo:vTodo,class:vClass,settings:vSettings}[view]();
   const tabs=[['today','Aujourd’hui']];
   if(m.agenda)tabs.push(['agenda','Agenda']);
   if(m.notes)tabs.push(['todo','À faire']);
-  if(m.class||m.ideas||m.res||m.rec||m.photos)tabs.push(['class','Classe']);
+  if(m.class||m.ideas||m.infos||m.res||m.rec)tabs.push(['class','Classe']);
   tabs.splice(Math.ceil(tabs.length/2),0,['add','']);
   $('#nav').style.gridTemplateColumns='repeat('+tabs.length+',1fr)';
   $('#nav').innerHTML=tabs.map(([k,l])=>k==='add'?`<button class="plus" data-act="capture" aria-label="Noter vite"><span>${ICONS.plus}</span></button>`:`<button class="${view===k?'on':''}" data-act="view" data-v="${k}">${ICONS[k==='class'&&!m.class?'msgs':k]}${l}</button>`).join('');
@@ -693,7 +697,7 @@ function renderSheet(){
     <div class="field"><label for="od">Date</label><input id="od" type="date" value="${o.date}"></div>
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delObs" data-id="${o.ts}">Supprimer</button><button class="btn ghost" data-act="backPupil">Annuler</button><button class="btn block" data-act="saveObs">Enregistrer</button></div>`;
   }else if(sheet.type==='idea'){
-    body=`<div class="grab"></div><h3>Idée</h3><div class="field"><textarea id="iet" style="min-height:120px">${esc(sheet.d.text)}</textarea></div><div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delIdea">Supprimer</button><button class="btn block" data-act="saveIdea">Enregistrer</button></div>`;
+    body=`<div class="grab"></div><h3>${sheet.d.k==='infoList'?'Info':'Idée'}</h3><div class="field"><textarea id="iet" style="min-height:120px">${esc(sheet.d.text)}</textarea></div><div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delIdea">Supprimer</button><button class="btn block" data-act="saveIdea">Enregistrer</button></div>`;
   }else if(sheet.type==='res'){
     const r=sheet.d;
     body=`<div class="grab"></div><h3>${r.id?'Modifier la ressource':'Nouvelle ressource'}</h3>
@@ -708,6 +712,8 @@ function renderSheet(){
     <div class="field"><label for="tx">Message</label><textarea id="tx" style="min-height:190px">${esc(t.text)}</textarea><p class="hint">Écris {prénom} là où le prénom de l’élève doit apparaître.</p></div>
     <div style="display:flex;gap:10px;margin-top:20px">${t.id?'<button class="btn danger" data-act="delTpl">Supprimer</button>':'<button class="btn ghost" data-act="close">Annuler</button>'}<button class="btn block" data-act="saveTpl">Enregistrer</button></div>`;
   }
+  const OK={note:'saveNote',event:'saveEvent',res:'saveRes',idea:'saveIdea',obs:'saveObs'}[sheet.type];
+  if(OK)body=body.replace('<div class="grab"></div>','<div class="grab"></div><div class="okwrap"><button class="okfab" data-act="'+OK+'" aria-label="Enregistrer">'+ICONS.check+'</button></div>');
   L.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet ${sheet.type==='pupil'?'tall':''}" role="dialog" aria-modal="true">${body}</div></div>`;
 }
 
@@ -749,10 +755,10 @@ const ACT={
   saveRes:()=>{const r=sheet.d;r.url=$('#ru').value.trim();r.desc=$('#rd').value.trim();if(!r.url){toast('Colle un lien d’abord');return}
     if(r.id){const i=S.res.findIndex(x=>x.id===r.id);S.res[i]={...r}}else S.res.push({...r,id:uid(),ts:Date.now()});persist();sheet=null;render();toast('Ressource gardée')},
   delRes:()=>{S.res=S.res.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()},
-  addIdea:()=>{const t=$('#idn'),v=t&&t.value.trim();if(!v){toast('Écris une idée d’abord');return}S.ideaList.push({id:uid(),text:v,ts:Date.now()});persist();render();const n=$('#idn');n&&n.focus()},
-  editIdea:(v,id)=>{const x=S.ideaList.find(q=>q.id===id);if(x){openSheet({type:'idea',d:{...x}});setTimeout(()=>{const c=$('#iet');c&&c.focus()},60)}},
-  saveIdea:()=>{const d=sheet.d,v=$('#iet').value.trim();if(!v){toast('Écris une idée d’abord');return}const x=S.ideaList.find(q=>q.id===d.id);if(x)x.text=v;persist();sheet=null;render()},
-  delIdea:(v,id)=>{S.ideaList=S.ideaList.filter(q=>q.id!==(id||(sheet&&sheet.d&&sheet.d.id)));persist();sheet=null;render();toast('Supprimée · touche ↩ pour annuler')},
+  addIdea:()=>{const t=$('#idn'),v=t&&t.value.trim();if(!v){toast('Écris une idée d’abord');return}S[LK()].push({id:uid(),text:v,ts:Date.now()});persist();render();const n=$('#idn');n&&n.focus()},
+  editIdea:(v,id)=>{const x=S[LK()].find(q=>q.id===id);if(x){openSheet({type:'idea',d:{...x,k:LK()}});setTimeout(()=>{const c=$('#iet');c&&c.focus()},60)}},
+  saveIdea:()=>{const d=sheet.d,v=$('#iet').value.trim();if(!v){toast('Écris une idée d’abord');return}const x=S[d.k].find(q=>q.id===d.id);if(x)x.text=v;persist();sheet=null;render()},
+  delIdea:(v,id)=>{const k=sheet&&sheet.d&&sheet.d.k||LK();S[k]=S[k].filter(q=>q.id!==(id||(sheet&&sheet.d&&sheet.d.id)));persist();sheet=null;render();toast('Supprimée · touche ↩ pour annuler')},
   cmode:v=>{classMode=v;render()},
   settings:()=>setView('settings'),
   close:()=>closeSheet(),

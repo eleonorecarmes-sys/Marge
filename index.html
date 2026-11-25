@@ -406,11 +406,10 @@ function vToday(){
   h+=`<button class="addrow" data-act="addTask" aria-label="Ajouter une tâche">${ICONS.plus}</button>`;
   if(isT){
     const tm=ymd(addDays(now,1)),end=ymd(addDays(now,7));
-    const tev=S.events.filter(e=>e.date===tm).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99')),tt=sorted.filter(n=>n.due===tm);
-    h+=`<h2>Demain · ${frDate(addDays(now,1))}</h2>`+((tev.length||tt.length)?tev.map(e=>eventCard(e)).join('')+tt.map(n=>itemRow(n)).join(''):'<div class="empty">Rien de prévu demain.</div>');
-    const arr=[...S.events.filter(e=>e.date>tm&&e.date<=end).map(e=>({d:e.date,t:e.time||'97',h:eventCard(e)})),...sorted.filter(n=>n.due>tm&&n.due<=end).map(n=>({d:n.due,t:'98',h:itemRow(n)}))].sort((a,b)=>a.d.localeCompare(b.d)||a.t.localeCompare(b.t));
+    const arr=[...S.events.filter(e=>e.date>today&&e.date<=end).map(e=>({d:e.date,t:e.time||'97',h:eventCard(e)})),...sorted.filter(n=>n.due>today&&n.due<=end).map(n=>({d:n.due,t:'98',h:itemRow(n)}))].sort((a,b)=>a.d.localeCompare(b.d)||a.t.localeCompare(b.t));
     if(arr.length)h+=`<h2>Cette semaine <span class="n">${arr.length}</span></h2>`+arr.map(x=>x.h).join('');
   }
+  if(isT&&!(now.getDay()===5&&now.getHours()>=12||now.getDay()===6||now.getDay()===0))h+=`<p style="text-align:center;margin:18px 0 4px"><button class="link" data-act="bilan">Bilan de la semaine</button></p>`;
   if(S.demo)h+=`<div class="demo">Ces notes sont des <b>données de démonstration</b> inspirées d’une vraie journée de classe. <button data-act="clearDemo">Les effacer</button></div>`;
   return h;
 }

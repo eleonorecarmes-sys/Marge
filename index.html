@@ -662,7 +662,7 @@ function renderSheet(){
     const todo=mine.filter(n=>!n.done).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')),doneT=mine.filter(n=>n.done);
     const obs=p.notes.filter(x=>!x.noteId).slice().reverse();
     const nHist=pastEv.length+doneT.length;
-    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" data-drag="o:${x.ts}" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
+    const nrow=x=>{const d=new Date(x.ts);return `<div class="swipe" data-drag="o:${x.ts}"><button class="swdel" data-act="delObs" data-id="${x.ts}">Supprimer</button><div class="item" style="--c:${NEUTRAL}"><button class="body" data-act="editObs" data-id="${x.ts}"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></button></div></div>`};
     const sec=(t,n,c)=>`<h2 style="margin:16px 0 8px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></i>${t} <span class="n">${n}</span></h2>`;
     const ty=f.type||'note';
     const lab={note:['Observation','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
@@ -680,6 +680,12 @@ function renderSheet(){
     ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneT.map(n=>itemRow(n)).join(''):''}`:''}
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button><button class="btn ghost block" data-act="close">Fermer</button></div>`;
     body='<div class="psheet">'+body+'</div>';
+  }else if(sheet.type==='obs'){
+    const o=sheet.d,pu=pupil(o.pid);
+    body=`<div class="grab"></div><h3>Observation${pu?' · '+esc(pu.name):''}</h3>
+    <div class="field"><label for="ot">Texte</label><textarea id="ot" style="min-height:110px">${esc(o.text)}</textarea></div>
+    <div class="field"><label for="od">Date</label><input id="od" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa" value="${o.date}"></div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delObs" data-id="${o.ts}">Supprimer</button><button class="btn ghost" data-act="backPupil">Annuler</button><button class="btn block" data-act="saveObs">Enregistrer</button></div>`;
   }else if(sheet.type==='idea'){
     body=`<div class="grab"></div><h3>Idée</h3><div class="field"><textarea id="iet" style="min-height:120px">${esc(sheet.d.text)}</textarea></div><div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delIdea">Supprimer</button><button class="btn block" data-act="saveIdea">Enregistrer</button></div>`;
   }else if(sheet.type==='res'){
@@ -709,6 +715,7 @@ function readNote(){
 function readPupil(){if(!sheet||sheet.type!=='pupil')return;const t=$('#pn');if(t)sheet.f.text=t.value;const d=$('#pd');if(d){sheet.f.date=d.value;if(d.value&&sheet.f.type==='todo')sheet.f.when=''}const tm=$('#pt');if(tm)sheet.f.time=tm.value}
 function fmtBirth(b){return b&&b.length===10?b.slice(8)+'/'+b.slice(5,7)+'/'+b.slice(0,4):''}
 function parseBirth(t){const d=String(t||'').replace(/\D/g,'');if(d.length!==8)return null;const D=+d.slice(0,2),M=+d.slice(2,4),Y=+d.slice(4);if(M<1||M>12||D<1||Y<1990||Y>new Date().getFullYear()+1)return null;const dt=new Date(Y,M-1,D);if(dt.getMonth()!==M-1)return null;return ymd(dt)}
+function parseDMY(t){const d=String(t||'').replace(/\D/g,'');if(d.length!==8)return null;const D=+d.slice(0,2),M=+d.slice(2,4),Y=+d.slice(4);if(M<1||M>12||D<1||Y<2000||Y>2100)return null;const dt=new Date(Y,M-1,D);return dt.getMonth()===M-1?dt:null}
 function agoYears(b,at){const y=+b.slice(0,4),d=at?fromYmd(at):new Date(),a=d.getFullYear()-y;return a}
 function resizeImage(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const m=900,s=Math.min(1,m/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.7))};im.src=r.result};r.readAsDataURL(file)})}
 function weeklyCopies(ev,n){for(let i=1;i<=n;i++)S.events.push({...ev,id:uid(),date:ymd(addDays(fromYmd(ev.date),7*i))})}
@@ -724,6 +731,12 @@ function icsOf(e,rep){
 }
 const ACT={
   view:v=>setView(v),
+  editObs:(v,id)=>{const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;const o=pu.notes.find(x=>String(x.ts)===id&&!x.noteId);if(!o)return;const d=new Date(o.ts);
+    openSheet({type:'obs',d:{pid:pu.id,ts:o.ts,text:o.text,date:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()}})},
+  backPupil:()=>{const pid=sheet.d.pid;openSheet({type:'pupil',id:pid,f:{type:'note',text:'',when:'',date:'',time:''}})},
+  saveObs:()=>{const o=sheet.d,pu=pupil(o.pid),t=$('#ot').value.trim(),dt=parseDMY($('#od').value);if(!t){toast('Écris l’observation d’abord');return}if(!dt){toast('Date non reconnue, écris par exemple 09/10/2026');return}
+    const x=pu&&pu.notes.find(q=>String(q.ts)===String(o.ts)&&!q.noteId);if(x){const old=new Date(x.ts);dt.setHours(old.getHours(),old.getMinutes(),old.getSeconds(),old.getMilliseconds());x.text=t;x.ts=dt.getTime()}
+    persist();ACT.backPupil();render()},
   addRes:()=>{openSheet({type:'res',d:{url:'',desc:'',subject:''}});setTimeout(()=>{const c=$('#ru');c&&c.focus()},60)},
   editRes:(v,id)=>{const r=S.res.find(x=>x.id===id);if(r)openSheet({type:'res',d:{...r}})},
   rsub:v=>{const r=sheet.d;r.url=$('#ru').value;r.desc=$('#rd').value;r.subject=v;renderSheet()},
@@ -842,6 +855,7 @@ const ACT={
     sheet.f={type:ty,text:'',when:'',date:'',time:''};persist();renderSheet();render();
   },
   ptype:v=>{readPupil();sheet.f.type=v;sheet.f.date='';sheet.f.when='';renderSheet()},
+  delObs:(v,id)=>{let pid=sheet&&sheet.type==='pupil'?sheet.id:sheet&&sheet.d&&sheet.d.pid,key=id||(sheet.d&&String(sheet.d.ts)),pu=pupil(pid);if(!pu)return;pu.notes=pu.notes.filter(x=>!(String(x.ts)===String(key)&&!x.noteId));persist();toast('Supprimée · touche ↩ pour annuler');if(sheet.type==='obs')ACT.backPupil();else renderSheet();render()},
   delPupil:(v,id)=>{S.pupils=S.pupils.filter(x=>x.id!==id);S.notes.forEach(n=>{if(n.pupilId===id)n.pupilId=''});S.events.forEach(e=>{if(e.pupilId===id)e.pupilId=''});persist();sheet=null;render()},
   copy:(v,id)=>doCopy(id,false),share:(v,id)=>doCopy(id,true),
   editTpl:(v,id)=>{const t=S.templates.find(x=>x.id===id);if(t)openSheet({type:'tpl',d:{...t}})},
@@ -868,7 +882,7 @@ function doCopy(id,share){
   if(share&&navigator.share){navigator.share({text:txt}).catch(()=>{});return}
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copié')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copié')}catch(e){toast('Copie impossible')}ta.remove()});
 }
-const MUT=new Set(['addIdea','saveIdea','delIdea','saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
+const MUT=new Set(['delObs','saveObs','addIdea','saveIdea','delIdea','saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
 function convertTo(kind,id,target){
   const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;

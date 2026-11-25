@@ -946,6 +946,12 @@ document.addEventListener('click',ev=>{
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!sheet){genRecurring();render()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&sheet)closeSheet()});
+document.addEventListener('focusin',ev=>{const t=ev.target;if(t&&t.id==='idt'&&!t.value.trim()){t.value='• ';S.ideas=t.value;persist();try{t.setSelectionRange(2,2)}catch(e){}}});
+document.addEventListener('keydown',ev=>{const t=ev.target;if(!t||t.id!=='idt'||ev.key!=='Enter')return;ev.preventDefault();
+  const v=t.value,a=t.selectionStart,b=t.selectionEnd,ls=v.lastIndexOf('\n',a-1)+1,line=v.slice(ls,a);let pos;
+  if(line.trim()==='•'){t.value=v.slice(0,ls)+v.slice(b);pos=ls}
+  else{const ins='\n• ';t.value=v.slice(0,a)+ins+v.slice(b);pos=a+ins.length}
+  try{t.setSelectionRange(pos,pos)}catch(e){}S.ideas=t.value;persist()});
 function keepFocus(id,val,setter){const t=$('#'+id);const pos=t.selectionStart;setter(val);render();const i=$('#'+id);i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}
 document.addEventListener('input',ev=>{
   const t=ev.target;

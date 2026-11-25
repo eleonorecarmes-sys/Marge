@@ -93,7 +93,8 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .chip.on.c i{background:#fff}
 .chip svg{width:16px;height:16px;stroke:currentColor}
 .seg{display:inline-grid;grid-auto-flow:column;background:var(--line);border-radius:12px;padding:3px;gap:3px}
-.seg button{padding:7px 14px;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted);text-align:center}
+.seg button{padding:7px 10px;white-space:nowrap;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted);text-align:center}
+.cseg{display:grid;grid-auto-columns:1fr;width:100%}.cseg button{padding:8px 2px;font-size:13px}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:20}
 nav .in{max-width:560px;margin:0 auto;display:grid;align-items:end}
@@ -300,7 +301,7 @@ function seed(){
 }
 let S=load()||seed();
 const ACCENTS=[['marine','Marine','#1b3a6b','#8fb2ee'],['bleu','Bleu','#1f5fbf','#7fb0f5'],['sapin','Vert sapin','#1f6f5c','#5fc2a5'],['prune','Prune','#6a3b6e','#c79bd0'],['bordeaux','Bordeaux','#8a2f3f','#e59aa6'],['ardoise','Ardoise','#3c4658','#aab6cc']];
-const DEF_SET={accent:'marine',theme:'light',editTemplates:true,modules:{agenda:true,notes:true,class:true,msgs:false,ideas:true,res:true,avant:true,photos:true,pupilNotes:true}};
+const DEF_SET={accent:'marine',theme:'light',editTemplates:true,modules:{agenda:true,notes:true,class:true,msgs:false,ideas:true,res:true,rec:true,avant:true,photos:true,pupilNotes:true}};
 const TEMPLATES=[
  ['Absence d’un élève','Bonjour,\n\nJe vous remercie de m’avoir prévenue de l’absence de {prénom}. Je lui ferai passer le travail vu en classe dès son retour.\n\nCordialement,'],
  ['Demande de rendez-vous','Bonjour,\n\nJe souhaiterais vous rencontrer au sujet de {prénom}. Seriez-vous disponible cette semaine, par exemple après la classe ?\n\nCordialement,'],
@@ -498,9 +499,10 @@ function vPhotos(){
 }
 function vClass(){
   const M=S.settings.modules;
-  const modes=[];if(M.class)modes.push(['eleves','Élèves']);if(M.ideas)modes.push(['ideas','Idées']);if(M.res)modes.push(['res','Ressources']);if(M.photos)modes.push(['photos','Photos']);
+  const modes=[];if(M.class)modes.push(['eleves','Élèves']);if(M.ideas)modes.push(['ideas','Idées']);if(M.res)modes.push(['res','Ressources']);if(M.rec)modes.push(['rec','Récurrent']);if(M.photos)modes.push(['photos','Photos']);
   if(!modes.some(m=>m[0]===classMode))classMode=modes[0]?modes[0][0]:'eleves';
-  const seg=modes.length>1?`<div class="seg" style="margin:4px 0 12px">${modes.map(([k,l])=>`<button class="${classMode===k?'on':''}" data-act="cmode" data-v="${k}">${l}</button>`).join('')}</div>`:'';
+  const seg=modes.length>1?`<div class="seg cseg" style="margin:4px 0 12px">${modes.map(([k,l])=>`<button class="${classMode===k?'on':''}" data-act="cmode" data-v="${k}">${l}</button>`).join('')}</div>`:'';
+  if(classMode==='rec')return seg+vRec();
   if(classMode==='ideas')return seg+vIdeas();
   if(classMode==='res')return seg+vRes();
   if(classMode==='photos')return seg+vPhotos();
@@ -511,6 +513,10 @@ function vClass(){
   return h;
 }
 
+function vRec(){
+  const b=card(S.recurring.map(r=>`<div class="setrow"><div class="main"><b>${esc(r.text)}</b><small>Tous les ${JOURS[r.day]}s</small></div><button class="iconbtn" data-act="delRec" data-id="${r.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow" style="display:block"><input id="rt" placeholder="Ex. Faire l’agenda en ligne" value="${esc(recDraft.text)}" autocomplete="off"><div class="chips" style="margin:10px 0">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${recDraft.day===d?'on':''}" data-act="recday" data-v="${d}">${JOURS[d].slice(0,3)}.</button>`).join('')}</div><button class="btn block" data-act="addRec">Ajouter</button></div>`);
+  return `<div class="top"><div><h1>Récurrentes</h1><p class="sub">Des tâches qui reviennent toutes seules chaque semaine dans « À faire ».</p></div>${gear()}</div>`+b;
+}
 function vIdeas(){
   const L=S.ideaList.slice().sort((a,b)=>b.ts-a.ts);
   return `<div class="top"><div><h1>Idées</h1><p class="sub">Les idées et propositions de tes élèves.</p></div>${gear()}</div>
@@ -542,7 +548,7 @@ function vSettings(){
   const sw=(on,attr)=>`<button class="switch ${on?'on':''}" role="switch" aria-checked="${on}" ${attr}></button>`;
   const mod=(k,l,d)=>`<div class="setrow"><div class="main"><b>${l}</b><small>${d}</small></div>${sw(m[k],`data-act="mod" data-v="${k}" aria-label="${l}"`)}</div>`;
   const soon=(l,d)=>`<div class="setrow soon"><div class="main"><b>${l}</b><small>${d}</small></div><span class="badge">Bientôt</span></div>`;
-  const tabs=[['app','Apparence'],['subj','Matières'],['fn','Fonctions'],['rec','Récurrentes'],['data','Données']];
+  const tabs=[['app','Apparence'],['subj','Matières'],['fn','Fonctions'],['data','Données']];
   const intro={app:'La couleur de l’appli, le mode clair ou sombre et le nom de ta classe.',subj:'Les matières et leur couleur, pour classer tes tâches.',fn:'Choisis ce qui apparaît dans Marge. Ce que tu désactives disparaît des onglets.',rec:'Des tâches qui reviennent toutes seules chaque semaine dans « À faire ».',msg:'Les modèles de messages aux parents.',data:'Tout reste sur cet appareil. Rien n’est envoyé sur Internet.'};
   let b='';
   if(setTab==='app')b=card(`<div class="setrow" style="flex-wrap:wrap;gap:6px;justify-content:space-between">${ACCENTS.map(a=>`<button class="sw ${st.accent===a[0]?'on':''}" data-act="accent" data-v="${a[0]}" aria-label="${a[1]}"><i style="background:${a[2]}"></i></button>`).join('')}</div>
@@ -555,8 +561,8 @@ function vSettings(){
     mod('pupilNotes','Observations par élève','Ce que tu notes sur chaque élève, daté')+
     mod('ideas','Idées','Une zone de texte pour les idées de tes élèves')+
     mod('res','Ressources','Garder les liens des sites utiles, par matière')+
+    mod('rec','Tâches récurrentes','Des tâches qui reviennent chaque semaine')+
     mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))+`<h2>Idées pour plus tard</h2>`+card(soon('Notifications qui sonnent','Des rappels même quand l’appli est fermée')+soon('Synchro entre appareils','Ordinateur, tablette et téléphone')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier'))+'<p class="hint">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>';
-  if(setTab==='rec')b=card(S.recurring.map(r=>`<div class="setrow"><div class="main"><b>${esc(r.text)}</b><small>Tous les ${JOURS[r.day]}s</small></div><button class="iconbtn" data-act="delRec" data-id="${r.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow" style="display:block"><input id="rt" placeholder="Ex. Faire l’agenda en ligne" value="${esc(recDraft.text)}" autocomplete="off"><div class="chips" style="margin:10px 0">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${recDraft.day===d?'on':''}" data-act="recday" data-v="${d}">${JOURS[d].slice(0,3)}.</button>`).join('')}</div><button class="btn block" data-act="addRec">Ajouter</button></div>`);
   if(setTab==='msg')b=card(`<div class="setrow"><div class="main"><b>Autoriser la modification des modèles</b><small>Modifier, ajouter ou supprimer tes modèles de messages</small></div>${sw(st.editTemplates,'data-act="opt" data-v="editTemplates" aria-label="Modifier les modèles"')}</div>`)+(m.msgs?'<button class="btn ghost block" style="margin-top:12px" data-act="gomsgs">Ouvrir mes modèles</button>':'');
   if(setTab==='data')b=`<div style="display:grid;gap:10px"><button class="btn ghost block" data-act="export">Enregistrer une copie</button><label class="btn ghost block" for="imp" style="cursor:pointer">Restaurer une copie</label><input id="imp" type="file" accept=".json,application/json" class="sr"><button class="btn danger block" data-act="reset">Tout effacer</button></div><p class="hint">Pour passer sur un autre appareil : enregistre une copie, envoie-la (AirDrop, Messages…), puis restaure-la là-bas.</p>`;
   return `<div class="top"><div><h1>Réglages</h1></div><button class="btn ghost" data-act="view" data-v="today" style="min-height:42px">Terminé</button></div>
@@ -567,12 +573,12 @@ function vSettings(){
 function render(){
   swOpen=null;
   const m=S.settings.modules;
-  if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.ideas&&!m.res&&!m.photos))view='today';
+  if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.ideas&&!m.res&&!m.rec&&!m.photos))view='today';
   $('#app').innerHTML={today:vToday,agenda:vAgenda,todo:vTodo,class:vClass,settings:vSettings}[view]();
   const tabs=[['today','Aujourd’hui']];
   if(m.agenda)tabs.push(['agenda','Agenda']);
   if(m.notes)tabs.push(['todo','À faire']);
-  if(m.class||m.ideas||m.res||m.photos)tabs.push(['class','Classe']);
+  if(m.class||m.ideas||m.res||m.rec||m.photos)tabs.push(['class','Classe']);
   tabs.splice(Math.ceil(tabs.length/2),0,['add','']);
   $('#nav').style.gridTemplateColumns='repeat('+tabs.length+',1fr)';
   $('#nav').innerHTML=tabs.map(([k,l])=>k==='add'?`<button class="plus" data-act="capture" aria-label="Noter vite"><span>${ICONS.plus}</span></button>`:`<button class="${view===k?'on':''}" data-act="view" data-v="${k}">${ICONS[k==='class'&&!m.class?'msgs':k]}${l}</button>`).join('');

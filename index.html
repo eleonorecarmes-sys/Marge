@@ -209,6 +209,7 @@ const TAGS=[['parent','Parent'],['collegue','Collègue'],['direction','Direction
 const tagLabel=k=>(TAGS.find(t=>t[0]===k)||TAGS[4])[1];
 const PALETTE=['#4F5BD5','#F28C28','#9B5CF6','#E8527A','#14B8A6','#E5B000','#A0714F','#4CAF50','#2BA8E0','#D946EF','#8A94A6'];
 const NEUTRAL='#8A94A6';
+const PICK=['#4F5BD5','#2BA8E0','#14B8A6','#4CAF50','#9BC53D','#E5B000','#F28C28','#E8527A','#D92D4A','#9B5CF6','#D946EF','#A0714F','#8A94A6','#1B3A6B','#0F766E','#B45309','#7C3AED','#475569'];
 const EV={reunion:['Réunion','#E5A100'],rdv:['Rendez-vous','#14B8A6'],echeance:['Date limite','#D92D4A'],autre:['Autre','#5B6B82']};
 const DEF_SUBJECTS=[['francais','Français','#4F5BD5'],['maths','Maths','#F28C28'],['decouverte','Découverte du monde','#4CAF50'],['anglais','Anglais','#2BA8E0'],['arts','Arts & EPS','#E8527A'],['reunions','Réunions','#E5B000'],['admin','Administratif','#8A94A6']].map(([id,name,color])=>({id,name,color}));
 const KEYWORDS={francais:/francais|lecture|dictee|ecriture|grammaire|conjugaison|vocabulaire|orthograph/,maths:/math|calcul|probleme|geometrie|multiplic|addition|numeration/,decouverte:/sciences|histoire|geograph|decouverte|vivant/,anglais:/anglais|english/,arts:/\barts?\b|dessin|musique|\beps\b|sport|piscine|chant/,reunions:/reunion|conseil|rendez-vous|\brdv\b/,admin:/signer|papier|\bmail\b|dossier|formulaire|administ|inscription|photocop|directrice/};
@@ -309,7 +310,7 @@ function applyTheme(){
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#13141b':'#ffffff';
 }
 
-let hist=[],redo=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
+let openColor='',hist=[],redo=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function setView(v){if(v==='today'&&view==='today')tDay=ymd(new Date());view=v;sheet=null;render();window.scrollTo(0,0)}
 const subj=id=>S.subjects.find(x=>x.id===id);
@@ -490,7 +491,7 @@ function vSettings(){
   let b='';
   if(setTab==='app')b=card(`<div class="setrow" style="flex-wrap:wrap;gap:6px;justify-content:space-between">${ACCENTS.map(a=>`<button class="sw ${st.accent===a[0]?'on':''}" data-act="accent" data-v="${a[0]}" aria-label="${a[1]}"><i style="background:${a[2]}"></i></button>`).join('')}</div>
     <div class="setrow"><div class="main"><b>Apparence</b></div><div class="seg"><button class="${st.theme==='light'?'on':''}" data-act="th" data-v="light">Clair</button><button class="${st.theme==='dark'?'on':''}" data-act="th" data-v="dark">Sombre</button><button class="${st.theme==='auto'?'on':''}" data-act="th" data-v="auto">Auto</button></div></div>`)+`<h2>Nom de la classe</h2><input id="cn" value="${esc(S.className||'')}" placeholder="Nom de la classe" autocomplete="off">`;
-  if(setTab==='subj')b=card(S.subjects.map(s=>`<div class="setrow"><button class="dotbtn" style="--c:${s.color}" data-act="cycleColor" data-id="${s.id}" aria-label="Changer la couleur"></button><input class="sname" data-sname="${s.id}" value="${esc(s.name)}" autocomplete="off"><button class="iconbtn" data-act="delSubject" data-id="${s.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow"><button class="link" data-act="addSubject">+ Ajouter une matière</button></div>`)+'<p class="hint">Touche la pastille de couleur pour la changer.</p>';
+  if(setTab==='subj')b=card(S.subjects.map(s=>`<div class="setrow"><button class="dotbtn" style="--c:${s.color}" data-act="pickColor" data-id="${s.id}" aria-label="Choisir la couleur"></button><input class="sname" data-sname="${s.id}" value="${esc(s.name)}" autocomplete="off"><button class="iconbtn" data-act="delSubject" data-id="${s.id}" aria-label="Supprimer">✕</button></div>`+(openColor===s.id?`<div class="setrow" style="display:block;background:var(--soft)"><div class="chips" style="gap:6px">${PICK.map(c=>`<button class="sw ${c.toLowerCase()===s.color.toLowerCase()?'on':''}" style="width:42px;height:42px" data-act="setColor" data-id="${s.id}" data-v="${c}" aria-label="${c}"><i style="background:${c};width:28px;height:28px"></i></button>`).join('')}</div><label style="display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--muted)">Autre couleur <input type="color" data-cust="${s.id}" value="${s.color.length===7?s.color:'#4F5BD5'}" style="width:56px;min-height:40px;padding:2px"></label></div>`:'')).join('')+`<div class="setrow"><button class="link" data-act="addSubject">+ Ajouter une matière</button></div>`)+'<p class="hint">Touche la pastille de couleur pour la changer.</p>';
   if(setTab==='fn')b=card(
     mod('agenda','Agenda','Semaine, mois, événements et dates limites')+
     mod('notes','À faire','Tes notes et tâches, triées par matière')+
@@ -720,6 +721,8 @@ const ACT={
   th:v=>{S.settings.theme=v;applyTheme();persist();render()},
   mod:v=>{S.settings.modules[v]=!S.settings.modules[v];persist();render()},
   opt:v=>{S.settings[v]=!S.settings[v];persist();render()},
+  pickColor:(v,id)=>{openColor=openColor===id?'':id;render()},
+  setColor:(v,id)=>{const s=subj(id);if(s){s.color=v;openColor='';persist();render()}},
   cycleColor:(v,id)=>{const s=subj(id);if(s){const i=PALETTE.indexOf(s.color);s.color=PALETTE[(i+1)%PALETTE.length];persist();render()}},
   addSubject:()=>{const used=S.subjects.map(s=>s.color);S.subjects.push({id:uid(),name:'Nouvelle matière',color:PALETTE.find(c=>!used.includes(c))||PALETTE[0]});persist();render()},
   delSubject:(v,id)=>{if(confirm('Supprimer cette matière ? Les notes restent, sans matière.')){S.subjects=S.subjects.filter(s=>s.id!==id);S.notes.forEach(n=>{if(n.subject===id)n.subject=''});persist();render()}},
@@ -733,7 +736,7 @@ function doCopy(id,share){
   if(share&&navigator.share){navigator.share({text:txt}).catch(()=>{});return}
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copié')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copié')}catch(e){toast('Copie impossible')}ta.remove()});
 }
-const MUT=new Set(['toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
+const MUT=new Set(['setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
 function closeSw(){if(swOpen){swOpen.classList.remove('open');const i=swOpen.lastElementChild;if(i)i.style.transform='';swOpen=null}}
 (function(){
@@ -773,6 +776,7 @@ document.addEventListener('change',async ev=>{
     readNote();
     try{sheet.d.photo=await resizeImage(ev.target.files[0]);renderSheet()}catch(e){toast('Photo illisible')}
   }
+  if(ev.target.dataset&&ev.target.dataset.cust){const s=subj(ev.target.dataset.cust);if(s){hist.push(JSON.stringify(S));redo=[];s.color=ev.target.value;openColor='';persist();render()}}
   if(ev.target.id==='nd'){readNote();renderSheet()}
   if(ev.target.id==='imp'&&ev.target.files[0]){
     try{const d=JSON.parse(await ev.target.files[0].text());if(!d||!Array.isArray(d.notes))throw 0;

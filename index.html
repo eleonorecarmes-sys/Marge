@@ -336,7 +336,7 @@ function hl(text,q){
 }
 function searchAll(q){const k=norm(q);return{
   notes:S.notes.filter(n=>matchNote(n,q)),
-  events:S.events.filter(e=>norm(e.title).includes(k)),
+  events:S.events.filter(e=>norm(e.title).includes(k)||(pupil(e.pupilId)&&norm(pupil(e.pupilId).name).includes(k))),
   pupils:S.pupils.filter(p=>norm(p.name).includes(k)||p.notes.some(x=>norm(x.text).includes(k)))}}
 
 const card=h=>`<div class="card">${h}</div>`;
@@ -361,7 +361,7 @@ function itemRow(n,q=''){
 }
 function eventCard(e,q=''){
   const [lab,c]=EV[e.kind]||EV.autre;
-  return `<button class="evc" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><div class="evt ${e.time?'':'day'}">${e.time||'Jour'}</div><div class="evb"><b>${hl(e.title,q)}</b><span>${lab}${e.date!==ymd(new Date())?' · '+frDate(fromYmd(e.date)):''}</span></div></button>`;
+  return `<button class="evc" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><div class="evt ${e.time?'':'day'}">${e.time||'Jour'}</div><div class="evb"><b>${hl(e.title,q)}</b><span>${lab}${pupil(e.pupilId)?' · '+esc(pupil(e.pupilId).name):''}${e.date!==ymd(new Date())?' · '+frDate(fromYmd(e.date)):''}</span></div></button>`;
 }
 
 function vToday(){
@@ -554,12 +554,14 @@ function renderSheet(){
     <div class="field"><label for="ed">Date</label><input id="ed" type="date" value="${e.date}"></div>
     <div class="field"><label for="eh">Heure (facultatif)</label><input id="eh" type="time" value="${e.time||''}"></div>
     <div class="field"><label>Type</label><div class="chips">${Object.entries(EV).map(([k,[l,c]])=>`<button class="chip c ${e.kind===k?'on':''}" style="--c:${c}" data-act="ekind" data-v="${k}"><i></i>${l}</button>`).join('')}</div></div>
+    ${S.pupils.length?`<div class="field"><label>Élève</label><div class="chips"><button class="chip ${!e.pupilId?'on':''}" data-act="epupil" data-v="">Aucun</button>${S.pupils.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>`<button class="chip ${e.pupilId===x.id?'on':''}" data-act="epupil" data-v="${x.id}">${ICONS.person}${esc(x.name)}</button>`).join('')}</div></div>`:''}
     <div class="field"><label>Rappel</label><div class="chips">${REM.map(([v,l])=>`<button class="chip ${String(e.remind??'')===v?'on':''}" data-act="erem" data-v="${v}">${l}</button>`).join('')}</div></div>
     <div style="display:flex;gap:10px;margin-top:20px">${e.id?'<button class="btn danger" data-act="delEvent">Supprimer</button>':'<button class="btn ghost" data-act="close">Annuler</button>'}<button class="btn block" data-act="saveEvent">Enregistrer</button></div>`;
   }else if(sheet.type==='pupil'){
     const p=pupil(sheet.id);if(!p){sheet=null;L.innerHTML='';return}
     const pn=S.settings.modules.pupilNotes,f=sheet.f;
-    body=`<div class="grab"></div><h3>${esc(p.name)}</h3>${pn?'<p class="sub">Notes de suivi</p>':''}
+    const evs=S.events.filter(e=>e.pupilId===p.id).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+    body=`<div class="grab"></div><h3>${esc(p.name)}</h3>${evs.length?`<h2 style="margin:14px 0 8px">Événements <span class="n">${evs.length}</span></h2>`+evs.map(e=>eventCard(e)).join(''):''}${pn?'<p class="sub">Notes de suivi</p>':''}
     ${pn?(p.notes.length?p.notes.slice().reverse().map(x=>{const d=new Date(x.ts),ln=x.noteId?S.notes.find(q=>q.id===x.noteId):null;return `<div class="item ${ln&&ln.done?'done':''}" style="--c:${ln?colorOf(ln):NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${ln?dueLabel(ln)+(ln.done?'<span class="pill plain">fait</span>':''):''}</div></div></div>`}).join(''):'<div class="empty">Pas encore de note.</div>'):''}
     ${pn?`<div class="field"><label for="pn">Ajouter une note</label><textarea id="pn" style="min-height:80px" placeholder="Ex. a oublié son cahier, rendez-vous à prévoir…">${esc(f.text)}</textarea></div>
     <div class="field"><label>À faire pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div>
@@ -630,7 +632,7 @@ const ACT={
     const base={text:txt,tag:d.tag,subject:d.subject,pupilId:d.pupilId,before:false,due,photo:d.photo,inbox:!(manual||autoDate),remind:d.isEvent?'':rem};
     let msg=base.inbox?'Gardé dans « À trier »':'Noté et rangé';
     if(autoDate)msg='Date reconnue : '+frDate(fromYmd(due));
-    if(d.isEvent){const k=norm(d.text);S.events.push({id:uid(),title:txt,date:due,time:d.time||'',kind:/reunion|conseil/.test(k)?'reunion':/rdv|rendez/.test(k)?'rdv':/date limite|rendre|avant le/.test(k)?'echeance':'autre',remind:rem});agSel=due;msg='Ajouté à l’agenda : '+frDate(fromYmd(due))+(d.time?' à '+d.time:'')}
+    if(d.isEvent){const k=norm(d.text);S.events.push({id:uid(),title:txt,pupilId:d.pupilId,date:due,time:d.time||'',kind:/reunion|conseil/.test(k)?'reunion':/rdv|rendez/.test(k)?'rdv':/date limite|rendre|avant le/.test(k)?'echeance':'autre',remind:rem});agSel=due;msg='Ajouté à l’agenda : '+frDate(fromYmd(due))+(d.time?' à '+d.time:'')}
     if(d.repeat&&due&&isNew){S.recurring.push({id:uid(),text:txt,day:fromYmd(due).getDay(),subject:d.subject,gen:[due]});msg='Noté, chaque semaine'}
     if(!isNew){const n=S.notes.find(x=>x.id===d.id);if(n){Object.assign(n,base);syncPupil(n)}msg=base.inbox?'Gardée dans « À trier »':'Rangée'}
     else if(keep){const n={id:uid(),ts:Date.now(),done:false,...base};S.notes.unshift(n);syncPupil(n)}
@@ -640,6 +642,7 @@ const ACT={
   tgEvent:()=>{readNote();const d=sheet.d;d.evTouched=true;d.isEvent=!d.isEvent;if(!d.isEvent)d.todo=true;renderSheet()},
   setRemind:v=>{readNote();sheet.d.remind=v;renderSheet()},
   tgRepeat:()=>{readNote();sheet.d.repeat=!sheet.d.repeat;renderSheet()},
+  epupil:v=>{const e=sheet.d;e.title=$('#et').value;e.date=$('#ed').value;e.time=$('#eh').value;e.pupilId=v;renderSheet()},
   erem:v=>{const e=sheet.d;e.title=$('#et').value;e.date=$('#ed').value;e.time=$('#eh').value;e.remind=v;renderSheet()},
   seen:(v,id)=>{const o=(v==='e'?S.events:S.notes).find(x=>x.id===id);if(o){o.seenOn=ymd(new Date());persist();render()}},
   photo:(v,id)=>openSheet({type:'photo',id}),
@@ -668,7 +671,7 @@ const ACT={
     else{p.notes.push({ts:Date.now(),text:t});toast('Note enregistrée')}
     sheet.f={text:'',when:'',date:''};persist();renderSheet();render();
   },
-  delPupil:(v,id)=>{S.pupils=S.pupils.filter(x=>x.id!==id);S.notes.forEach(n=>{if(n.pupilId===id)n.pupilId=''});persist();sheet=null;render()},
+  delPupil:(v,id)=>{S.pupils=S.pupils.filter(x=>x.id!==id);S.notes.forEach(n=>{if(n.pupilId===id)n.pupilId=''});S.events.forEach(e=>{if(e.pupilId===id)e.pupilId=''});persist();sheet=null;render()},
   copy:(v,id)=>doCopy(id,false),share:(v,id)=>doCopy(id,true),
   editTpl:(v,id)=>{const t=S.templates.find(x=>x.id===id);if(t)openSheet({type:'tpl',d:{...t}})},
   newTpl:()=>openSheet({type:'tpl',d:{title:'',text:''}}),

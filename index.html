@@ -395,6 +395,7 @@ function vToday(){
   const beforeLeft=sorted.filter(n=>n.before).length;
   if(isT){const R=reminders();if(R.length)h+=`<h2>Rappels <span class="n">${R.length}</span></h2>`+R.map(r=>`<div class="rem"><div class="body"><b>${esc(r.title)}</b><span>${r.when}</span></div><button class="btn ghost" data-act="seen" data-v="${r.kind}" data-id="${r.id}">Vu</button></div>`).join('')}
   if(isT&&(now.getDay()===5&&now.getHours()>=12||now.getDay()===6||now.getDay()===0))h+=`<button class="banner" data-act="bilan">Faire le bilan de la semaine</button>`;
+  if(isT){const md=k=>ymd(k).slice(5);[0,1,2].forEach(i=>{const m=md(addDays(now,i));S.pupils.filter(p=>p.birth===m).forEach(p=>{h+=`<div class="rem"><div class="body"><b>Anniversaire de ${esc(p.name)}</b><span>${i===0?'aujourd’hui':i===1?'demain':'dans 2 jours'}</span></div></div>`})})}
   if(M.notes&&inbox.length&&isT)h+=`<button class="banner" data-act="view" data-v="todo"><span class="n">${inbox.length}</span> note${inbox.length>1?'s':''} à trier</button>`;
   if(M.agenda){
     const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -468,7 +469,7 @@ function vClass(){
   const pn=M.pupilNotes;
   let h=seg+`<div class="top"><div><h1>${esc(S.className||'Ma classe')}</h1><p class="sub">${S.pupils.length} élève${S.pupils.length>1?'s':''} · prénoms ou initiales seulement</p></div>${gear()}</div>`;
   h+=card(S.pupils.length?S.pupils.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(p=>{const open=S.notes.filter(n=>n.pupilId===p.id&&!n.done).length;return `<div class="setrow"><button class="main" data-act="pupil" data-id="${p.id}" style="display:block"><b>${esc(p.name)}</b>${pn?`<small>${p.notes.length?esc(p.notes[p.notes.length-1].text):'Aucune note'}</small>`:''}</button>${open?`<span class="n">${open} à faire</span>`:''}<span style="color:var(--muted);width:20px;flex:none">${ICONS.chev}</span></div>`}).join(''):'<div class="empty">Ajoute les premiers élèves de ta classe.</div>');
-  h+=`<div class="field"><label for="np">Ajouter un élève</label><div style="display:flex;gap:8px"><input id="np" placeholder="Prénom ou initiale" autocomplete="off"><button class="btn" data-act="addPupil" style="flex:none">Ajouter</button></div><p class="hint">Aucune donnée ne quitte cet appareil.</p></div>`;
+  h+=`<div class="field"><label for="np">Ajouter un élève</label><div style="display:flex;gap:8px"><input id="np" placeholder="Prénom ou initiale" autocomplete="off"><button class="btn" data-act="addPupil" style="flex:none">Ajouter</button></div><label for="nb" style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px">Anniversaire (facultatif)</label><input id="nb" type="date"><p class="hint">Aucune donnée ne quitte cet appareil.</p></div>`;
   return h;
 }
 
@@ -600,7 +601,7 @@ function renderSheet(){
     const row=x=>{const d=new Date(x.ts),ln=x.noteId?S.notes.find(q=>q.id===x.noteId):null;return `<div class="item ${ln&&ln.done?'done':''}" style="--c:${ln?colorOf(ln):NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${ln?dueLabel(ln)+(ln.done?'<span class="pill plain">fait</span>':''):''}</div></div></div>`};
     const isDone=x=>{const ln=x.noteId&&S.notes.find(q=>q.id===x.noteId);return !!(ln&&ln.done)};
     const act=p.notes.filter(x=>!isDone(x)),doneN=p.notes.filter(isDone).reverse(),nHist=pastEv.length+doneN.length;
-    body=`<div class="grab"></div><h3>${esc(p.name)}</h3>${evs.length?`<h2 style="margin:14px 0 8px">Événements <span class="n">${evs.length}</span></h2>`+evs.map(e=>eventCard(e)).join(''):''}${pn?'<p class="sub">Notes de suivi</p>':''}
+    body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 6px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Anniversaire</label><input id="pb" type="date" data-pid="${p.id}" value="${p.birth?'2000-'+p.birth:''}" style="flex:1"></div>${evs.length?`<h2 style="margin:14px 0 8px">Événements <span class="n">${evs.length}</span></h2>`+evs.map(e=>eventCard(e)).join(''):''}${pn?'<p class="sub">Notes de suivi</p>':''}
     ${pn?(act.length?act.slice().reverse().map(row).join(''):'<div class="empty">Pas encore de note.</div>'):''}
     ${pn?`<div class="field"><label for="pn">Ajouter une note</label><textarea id="pn" style="min-height:80px" placeholder="Ex. a oublié son cahier, rendez-vous à prévoir…">${esc(f.text)}</textarea></div>
     <div class="field"><label>À faire pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div>
@@ -713,7 +714,7 @@ const ACT={
   delEvent:()=>{S.events=S.events.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()},
   pupil:(v,id)=>openSheet({type:'pupil',id,f:{text:'',when:'',date:''}}),
   pwhen:v=>{readPupil();sheet.f.when=v;sheet.f.date='';renderSheet()},
-  addPupil:()=>{const i=$('#np'),v=i.value.trim();if(v){S.pupils.push({id:uid(),name:v,notes:[]});persist();render()}},
+  addPupil:()=>{const i=$('#np'),v=i.value.trim(),b=$('#nb');if(v){S.pupils.push({id:uid(),name:v,notes:[],birth:b&&b.value?b.value.slice(5):''});persist();render()}},
   savePupilNote:(v,id)=>{
     readPupil();const p=pupil(id),f=sheet.f,t=f.text.trim();
     if(!p||!t){toast('Écris une note d’abord');return}
@@ -781,6 +782,9 @@ document.addEventListener('input',ev=>{
   else if(t.id==='gq'){sheet.q=t.value;$('#gres').innerHTML=resHTML(t.value.trim())}
   else if(t.id==='cn'){S.className=t.value;persist()}
   else if(t.dataset&&t.dataset.sname){const s=subj(t.dataset.sname);if(s){s.name=t.value;persist()}}
+});
+document.addEventListener('change',ev=>{
+  const b=ev.target;if(b&&b.id==='pb'){const p=pupil(b.dataset.pid);if(p){hist.push(JSON.stringify(S));redo=[];p.birth=b.value?b.value.slice(5):'';persist();render()}}
 });
 document.addEventListener('change',async ev=>{
   if(ev.target.id==='ph'&&ev.target.files[0]){

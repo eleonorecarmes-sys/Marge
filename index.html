@@ -49,6 +49,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .search svg{position:absolute;left:14px;top:14px;width:22px;height:22px;stroke:var(--muted)}
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .iconbtn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--muted);flex:none}
+.iconbtn:disabled{opacity:.3;cursor:default}
 .iconbtn svg{width:24px;height:24px;stroke:currentColor}
 .item{display:flex;gap:11px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--c,#8a94a6);border-radius:12px;padding:11px 12px;margin-bottom:8px}
 .item .body{flex:1;min-width:0}
@@ -158,6 +159,7 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .swipe{position:relative;margin-bottom:8px;border-radius:14px;overflow:hidden}
 .swipe .item,.swipe .evc{margin-bottom:0;position:relative;transition:transform .18s ease;touch-action:pan-y}
 .swipe.moving .item,.swipe.moving .evc{transition:none}
+.swipe:not(.open):not(.moving) .swdel{visibility:hidden}
 .swdel{position:absolute;right:0;top:0;bottom:0;width:92px;background:var(--danger);color:#fff;font-weight:700;display:grid;place-items:center;text-align:center;font-size:14px}
 </style>
 </head>
@@ -199,6 +201,7 @@ const ICONS={
  gear:sv('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
  back:sv('<path d="M15 5l-7 7 7 7"/>'),
  chev:sv('<path d="M9 5l7 7-7 7"/>'),
+ redo:sv('<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'),
  undo:sv('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>')
 };
 const TAGS=[['parent','Parent'],['collegue','Collègue'],['direction','Direction'],['eleve','Élève'],['autre','Autre']];
@@ -305,7 +308,7 @@ function applyTheme(){
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#13141b':'#ffffff';
 }
 
-let hist=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
+let hist=[],redo=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function setView(v){if(v==='today'&&view==='today')tDay=ymd(new Date());view=v;sheet=null;render();window.scrollTo(0,0)}
 const subj=id=>S.subjects.find(x=>x.id===id);
@@ -345,7 +348,7 @@ function searchAll(q){const k=norm(q);return{
   pupils:S.pupils.filter(p=>norm(p.name).includes(k)||p.notes.some(x=>norm(x.text).includes(k)))}}
 
 const card=h=>`<div class="card">${h}</div>`;
-const gear=()=>`<div style="display:flex;align-items:center;flex:none"><button class="iconbtn" data-act="gsearch" aria-label="Rechercher">${ICONS.search}</button>${hist.length?`<button class="iconbtn" data-act="undo" aria-label="Annuler la dernière action">${ICONS.undo}</button>`:''}<button class="iconbtn" data-act="settings" aria-label="Réglages">${ICONS.gear}</button></div>`;
+const gear=()=>`<div style="display:flex;align-items:center;flex:none"><button class="iconbtn" data-act="gsearch" aria-label="Rechercher">${ICONS.search}</button><button class="iconbtn" data-act="undo" aria-label="Annuler la dernière action" ${hist.length?'':'disabled'}>${ICONS.undo}</button><button class="iconbtn" data-act="redo" aria-label="Rétablir" ${redo.length?'':'disabled'}>${ICONS.redo}</button><button class="iconbtn" data-act="settings" aria-label="Réglages">${ICONS.gear}</button></div>`;
 function dueLabel(n){
   if(n.done||n.inbox)return '';
   const today=ymd(new Date());
@@ -431,7 +434,7 @@ function vTodo(){
 function vAgenda(){
   const sel=fromYmd(agSel),today=ymd(new Date());
   const hasEv=d=>S.events.some(e=>e.date===d)||S.notes.some(n=>n.due===d&&!n.done&&!n.inbox);
-  let h=`<div class="top"><h1>Agenda</h1><div style="display:flex;align-items:center;gap:4px"><div class="seg"><button class="${agMode==='week'?'on':''}" data-act="ag" data-v="week">Semaine</button><button class="${agMode==='month'?'on':''}" data-act="ag" data-v="month">Mois</button></div>${gear()}</div></div>`;
+  let h=`<div class="top"><h1>Agenda</h1>${gear()}</div><div class="seg" style="margin-top:6px"><button class="${agMode==='week'?'on':''}" data-act="ag" data-v="week">Semaine</button><button class="${agMode==='month'?'on':''}" data-act="ag" data-v="month">Mois</button></div>`;
   if(agMode==='week'){
     const mon=addDays(sel,-((sel.getDay()+6)%7));
     h+=`<div class="top" style="margin:10px 0 8px;align-items:center"><button class="iconbtn" data-act="shift" data-v="-7" aria-label="Semaine précédente">${ICONS.back}</button><b>${mon.getDate()} ${MOIS[mon.getMonth()]}</b><button class="iconbtn" data-act="shift" data-v="7" aria-label="Semaine suivante">${ICONS.chev}</button></div>
@@ -658,7 +661,8 @@ const ACT={
     toast(msg);persist();sheet=null;render();
   },
   gsearch:()=>{openSheet({type:'search',q:''});setTimeout(()=>{const c=$('#gq');c&&c.focus()},60)},
-  undo:()=>{const h=hist.pop();if(h){S=JSON.parse(h);ensure();applyTheme();persist();sheet=null;render();toast('Action annulée')}},
+  undo:()=>{const h=hist.pop();if(h){redo.push(JSON.stringify(S));S=JSON.parse(h);ensure();applyTheme();persist();sheet=null;render();toast('Action annulée')}},
+  redo:()=>{const h=redo.pop();if(h){hist.push(JSON.stringify(S));S=JSON.parse(h);ensure();applyTheme();persist();sheet=null;render();toast('Action rétablie')}},
   delQuick:(v,id)=>{S.notes=S.notes.filter(x=>x.id!==id);S.pupils.forEach(p=>{p.notes=p.notes.filter(x=>x.noteId!==id)});persist();render();toast('Supprimée · touche ↩ pour annuler')},
   delQuickE:(v,id)=>{S.events=S.events.filter(x=>x.id!==id);persist();render();toast('Supprimé · touche ↩ pour annuler')},
   stab:v=>{setTab=v;render()},
@@ -741,7 +745,7 @@ document.addEventListener('click',ev=>{
   const f=ACT[a];if(!f)return;
   const before=MUT.has(a)?JSON.stringify(S):null;
   f(t.dataset.v,t.dataset.id,t,ev);
-  if(before!==null&&JSON.stringify(S)!==before){hist.push(before);if(hist.length>10)hist.shift();render()}
+  if(before!==null&&JSON.stringify(S)!==before){hist.push(before);if(hist.length>20)hist.shift();redo=[];render()}
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!sheet){genRecurring();render()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&sheet)closeSheet()});
@@ -763,7 +767,7 @@ document.addEventListener('change',async ev=>{
   if(ev.target.id==='nd'){readNote();renderSheet()}
   if(ev.target.id==='imp'&&ev.target.files[0]){
     try{const d=JSON.parse(await ev.target.files[0].text());if(!d||!Array.isArray(d.notes))throw 0;
-      if(confirm('Remplacer les données de cet appareil par cette copie ?')){hist.push(JSON.stringify(S));S=d;ensure();applyTheme();persist();sheet=null;view='today';render();toast('Copie restaurée')}}
+      if(confirm('Remplacer les données de cet appareil par cette copie ?')){hist.push(JSON.stringify(S));redo=[];S=d;ensure();applyTheme();persist();sheet=null;view='today';render();toast('Copie restaurée')}}
     catch(e){toast('Fichier non reconnu')}
     ev.target.value='';
   }

@@ -451,7 +451,7 @@ function vAgenda(){
   h+=`<h2>${cap(frDate(sel))}</h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement ce jour-là.</div>');
   const dn=S.notes.filter(n=>n.due===agSel&&!n.done&&!n.inbox);
   if(dn.length)h+=`<h2>À faire <span class="n">${dn.length}</span></h2>`+dn.map(n=>itemRow(n)).join('');
-  h+=`<button class="addrow" style="margin-top:12px" data-act="addEvent" aria-label="Ajouter un événement">${ICONS.plus}</button>`;
+  h+=`<button class="addrow" style="margin-top:12px" data-act="addEvent" aria-label="Ajouter une tâche ou un événement">${ICONS.plus}</button>`;
   return h;
 }
 
@@ -705,7 +705,7 @@ const ACT={
   doneNote:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;persist()}sheet=null;render()},
   addEventDay:()=>openSheet({type:'event',d:{title:'',date:tDay,time:'',kind:'rdv'}}),
   addTask:()=>{const d=newDraft();applyDate(d,tDay);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
-  addEvent:()=>openSheet({type:'event',d:{title:'',date:agSel,time:'',kind:'rdv'}}),
+  addEvent:()=>{const d=newDraft();applyDate(d,agSel);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
   openEvent:(v,id)=>{const e=S.events.find(x=>x.id===id);if(e)openSheet({type:'event',d:{...e}})},
   ekind:v=>{const e=sheet.d;e.title=$('#et').value;e.date=$('#ed').value;e.time=$('#eh').value;e.kind=v;renderSheet()},
   saveEvent:()=>{const e=sheet.d;e.title=$('#et').value.trim();e.date=$('#ed').value;e.time=$('#eh').value;if(!e.title||!e.date){toast('Titre et date d’abord');return}

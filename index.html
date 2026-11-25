@@ -161,6 +161,8 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .wl.ev{border-left:3px solid var(--c);padding-left:8px;border-radius:3px}.wl .wt{flex:none;min-width:38px;font-size:12.5px;font-weight:700;color:var(--muted)}.wl.ev .wt{color:var(--c)}
 .wl.tk .wt i{display:block;width:13px;height:13px;border:2px solid var(--muted);border-radius:50%;margin:2px 0 0 4px}.wl .wx{flex:1;min-width:0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wempty{font-size:13px;color:var(--muted);padding:4px 2px}
+.dz{border-radius:14px;padding:0 2px}.dz.over{background:var(--accent-soft);outline:2px solid var(--accent)}.dzempty{display:none;padding:14px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted);font-size:14px;margin-bottom:8px}body.dnd .dzempty{display:block}
+.item[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .swipe[data-drag],.wl[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .dragging{opacity:.3}.dghost{position:fixed;z-index:200;pointer-events:none;opacity:.95;box-shadow:0 10px 30px rgba(0,0,0,.28);border-radius:14px;background:var(--surface);transform:scale(1.03)}
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:150;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.12)}
@@ -445,7 +447,10 @@ function vTodo(){
   <div class="search">${ICONS.search}<input id="qt" type="search" placeholder="Chercher dans mes notes…" value="${esc(qTodo)}" autocomplete="off"></div>
   <div class="chips scroll" style="margin-top:10px"><button class="chip ${!fSubj?'on':''}" data-act="tfilter" data-v="">Tout</button>${S.subjects.map(s=>`<button class="chip c ${fSubj===s.id?'on':''}" style="--c:${s.color}" data-act="tfilter" data-v="${s.id}"><i></i>${esc(s.name)}</button>`).join('')}<button class="chip ${fSubj==='none'?'on':''}" data-act="tfilter" data-v="none">Sans matière</button></div>`;
   if(inbox.length)h+=`<h2>À trier <span class="n">${inbox.length}</span></h2><p class="hint" style="margin:-4px 2px 10px">Touche une note pour la ranger : élève, matière, date.</p>`+inbox.map(n=>itemRow(n,q)).join('');
-  g.forEach(([lab,arr,warn])=>{if(arr.length)h+=`<h2 class="${warn?'late':''}">${lab} <span class="n">${arr.length}</span></h2>`+arr.sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')||b.ts-a.ts).map(n=>itemRow(n,q)).join('')});
+  const gd=[null,today,dueFor('week'),ymd(addDays(new Date(),14)),''];
+  g.forEach(([lab,arr,warn],gi)=>{const zone=gd[gi]!==null&&!q;if(!arr.length&&!zone)return;
+    const inner=`<h2 class="${warn?'late':''}">${lab} <span class="n">${arr.length}</span></h2>`+arr.sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')||b.ts-a.ts).map(n=>itemRow(n,q)).join('')+(arr.length?'':'<div class="dzempty">Déposer ici</div>');
+    h+=zone?`<div class="dz" data-zone="1" data-drop="${gd[gi]}">${inner}</div>`:inner});
   if(!inbox.length&&!rest.length)h+='<div class="empty" style="margin-top:16px">Rien à faire ici. Appuie sur + pour noter quelque chose.</div>';
   if(done.length){h+=`<h2><button class="link" data-act="toggleDone">${showDone?'Masquer':'Voir'} les terminées (${done.length})</button></h2>`;if(showDone)h+=done.sort((a,b)=>b.ts-a.ts).map(n=>itemRow(n,q)).join('')}
   return h;
@@ -467,14 +472,14 @@ function vAgenda(){
       const lines=bd.map(x=>`<div class="wl"><span class="wt">🎂</span><span class="wx">Anniversaire de ${esc(x.name)}</span></div>`).join('')
         +ev.map(e=>{const c=(EV[e.kind]||EV.autre)[1],pu=pupil(e.pupilId);return `<button class="wl ev" data-drag="e:${e.id}" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><span class="wt">${e.time||'Jour'}</span><span class="wx">${esc(e.title)}${pu?' · '+esc(pu.name):''}</span></button>`}).join('')
         +tk.map(n=>`<button class="wl tk" data-drag="n:${n.id}" data-act="openNote" data-id="${n.id}"><span class="wt"><i></i></span><span class="wx">${esc(n.text)}</span></button>`).join('');
-      h+=`<div class="wday ${k===today?'today':''} ${i>4?'we':''}" data-drop="${k}"><div class="wh"><b>${JL[i]} ${d.getDate()}</b><button class="wadd" data-act="dayAdd" data-v="${k}" aria-label="Ajouter ce jour-là">${ICONS.plus}</button></div>${lines||'<div class="wempty">Rien de prévu</div>'}</div>`;
+      h+=`<div class="wday ${k===today?'today':''} ${i>4?'we':''}" data-zone="1" data-drop="${k}"><div class="wh"><b>${JL[i]} ${d.getDate()}</b><button class="wadd" data-act="dayAdd" data-v="${k}" aria-label="Ajouter ce jour-là">${ICONS.plus}</button></div>${lines||'<div class="wempty">Rien de prévu</div>'}</div>`;
     }
     h+='</div>';
     return h;
   }else{
     const m=new Date(agMonth.getFullYear(),agMonth.getMonth(),1),start=addDays(m,-((m.getDay()+6)%7));
     h+=`<div class="top" style="margin:10px 0 8px;align-items:center"><button class="iconbtn" data-act="mshift" data-v="-1" aria-label="Mois précédent">${ICONS.back}</button><b>${cap(MOIS[m.getMonth()])} ${m.getFullYear()}</b><button class="iconbtn" data-act="mshift" data-v="1" aria-label="Mois suivant">${ICONS.chev}</button></div>
-    <div class="cal">${J3.map(j=>`<div class="dow">${j}</div>`).join('')}${Array.from({length:42},(_,i)=>{const d=addDays(start,i),k=ymd(d);return `<button class="${d.getMonth()!==m.getMonth()?'out':''} ${k===today?'today':''} ${k===agSel?'sel':''}" data-drop="${k}" data-act="day" data-v="${k}">${d.getDate()}${hasEv(k)?'<i></i>':''}</button>`}).join('')}</div>`;
+    <div class="cal">${J3.map(j=>`<div class="dow">${j}</div>`).join('')}${Array.from({length:42},(_,i)=>{const d=addDays(start,i),k=ymd(d);return `<button class="${d.getMonth()!==m.getMonth()?'out':''} ${k===today?'today':''} ${k===agSel?'sel':''}" data-zone="1" data-drop="${k}" data-act="day" data-v="${k}">${d.getDate()}${hasEv(k)?'<i></i>':''}</button>`}).join('')}</div>`;
   }
   const ev=S.events.filter(e=>e.date===agSel).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
   h+=`<h2>${cap(frDate(sel))}</h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement ce jour-là.</div>');
@@ -648,16 +653,16 @@ function renderSheet(){
     const todo=mine.filter(n=>!n.done).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')),doneT=mine.filter(n=>n.done);
     const obs=p.notes.filter(x=>!x.noteId).slice().reverse();
     const nHist=pastEv.length+doneT.length;
-    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
+    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" data-drag="o:${x.ts}" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
     const sec=(t,n,c)=>`<h2 style="margin:16px 0 8px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></i>${t} <span class="n">${n}</span></h2>`;
     const ty=f.type||'note';
     const lab={note:['Note','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
     const lb='display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
     const age=p.birth&&p.birth.length===10?`<span style="color:var(--muted);font-size:14px">${agoYears(p.birth)} ans</span>`:'';
     body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Né(e) le</label><input id="pb" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa" data-pid="${p.id}" value="${fmtBirth(p.birth)}" style="flex:1">${age}</div>
-    ${sec('À faire',todo.length,'#E8590C')}${todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Rien à faire pour cet élève.</div>'}
-    ${sec('Événements',evs.length,'#1C7ED6')}${evs.length?evs.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement à venir.</div>'}
-    ${pn?sec('Notes',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore de note.</div>'):''}
+    <div class="dz" data-zone="1" data-drop="ptype:todo">${sec('À faire',todo.length,'#E8590C')}${todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Rien à faire pour cet élève.</div>'}</div>
+    <div class="dz" data-zone="1" data-drop="ptype:event">${sec('Événements',evs.length,'#1C7ED6')}${evs.length?evs.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement à venir.</div>'}</div>
+    ${pn?`<div class="dz" data-zone="1" data-drop="ptype:note">${sec('Notes',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore de note.</div>')}</div>`:''}
     <div class="field" style="margin-top:20px"><label style="${lb}">Ajouter</label><div class="chips">${Object.keys(lab).map(k=>`<button class="chip ${ty===k?'on':''}" data-act="ptype" data-v="${k}">${lab[k][0]}</button>`).join('')}</div></div>
     <div class="field"><textarea id="pn" style="min-height:76px" placeholder="${lab[ty][1]}">${esc(f.text)}</textarea></div>
     ${ty==='todo'?`<div class="field"><label style="${lb}">Pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div><div style="margin-top:10px"><label for="pd" style="${lb}">Ou une date précise</label><input id="pd" type="date" value="${f.date||''}"></div></div>`:''}
@@ -843,21 +848,38 @@ function doCopy(id,share){
 }
 const MUT=new Set(['saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
+function convertTo(kind,id,target){
+  const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;
+  const same=(kind==='n'&&target==='todo')||(kind==='e'&&target==='event')||(kind==='o'&&target==='note');if(same)return;
+  let text='',due='',ts=0;
+  if(kind==='n'){const n=S.notes.find(x=>x.id===id);if(!n)return;text=n.text;due=n.due||''}
+  else if(kind==='e'){const e=S.events.find(x=>x.id===id);if(!e)return;text=e.title;due=e.date}
+  else{const o=pu.notes.find(x=>String(x.ts)===id&&!x.noteId);if(!o)return;text=o.text}
+  if(target==='event'&&!due){toast('Un événement a besoin d’une date : utilise « Ajouter » en bas');return}
+  hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[];
+  if(kind==='n'){S.notes=S.notes.filter(x=>x.id!==id);pu.notes=pu.notes.filter(x=>x.noteId!==id)}
+  else if(kind==='e')S.events=S.events.filter(x=>x.id!==id);
+  else pu.notes=pu.notes.filter(x=>!(String(x.ts)===id&&!x.noteId));
+  if(target==='todo'){const n={id:uid(),text,tag:'eleve',ts:Date.now(),before:false,done:false,due:kind==='e'?due:due,photo:null,subject:'',pupilId:pu.id,inbox:false};S.notes.unshift(n);syncPupil(n)}
+  else if(target==='note')pu.notes.push({ts:Date.now(),text});
+  else S.events.push({id:uid(),title:text,pupilId:pu.id,date:due,time:'',kind:'rdv',remind:''});
+  persist();render();renderSheet();toast('Déplacé');
+}
 (function(){
   let dg=null,timer=null,ghost=null,dock=null,raf=0,lastY=0,lastOver=null;
   const iso=d=>ymd(d);
   const chips=ev=>{const t=new Date(),T=iso(t),nm=iso(addDays(t,7-((t.getDay()+6)%7)));
     const a=[['Aujourd’hui',T],['Demain',iso(addDays(t,1))],['Cette semaine',dueFor('week')],['Sem. prochaine',nm]];if(!ev)a.push(['Sans date','']);return a};
   const dropOf=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest('[data-drop]')};
-  function cleanup(){clearTimeout(timer);timer=null;cancelAnimationFrame(raf);window._dragging=false;if(ghost){ghost.remove();ghost=null}if(dock){dock.remove();dock=null}
+  function cleanup(){document.body.classList.remove('dnd');clearTimeout(timer);timer=null;cancelAnimationFrame(raf);window._dragging=false;if(ghost){ghost.remove();ghost=null}if(dock){dock.remove();dock=null}
     document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'));document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));dg=null;lastOver=null}
   function begin(){
-    if(!dg)return;const src=dg.src,r=src.getBoundingClientRect();window._dragging=true;dg.active=true;
+    if(!dg)return;const src=dg.src,r=src.getBoundingClientRect();window._dragging=true;dg.active=true;document.body.classList.add('dnd');
     ghost=src.cloneNode(true);ghost.classList.add('dghost');ghost.classList.remove('dragging');ghost.style.width=r.width+'px';ghost.style.left=r.left+'px';ghost.style.top=r.top+'px';ghost.dataset.drag='';document.body.appendChild(ghost);
     src.classList.add('dragging');dg.ox=dg.x-r.left;dg.oy=dg.y-r.top;
-    dock=document.createElement('div');dock.className='dock';dock.innerHTML=chips(dg.kind==='e').map(([l,d])=>`<div data-drop="${d}">${l}</div>`).join('');document.body.appendChild(dock);
+    if(!document.querySelector('[data-zone]')){dock=document.createElement('div');dock.className='dock';dock.innerHTML=chips(dg.kind==='e').map(([l,d])=>`<div data-drop="${d}">${l}</div>`).join('');document.body.appendChild(dock)}
     try{navigator.vibrate&&navigator.vibrate(15)}catch(e){}
-    const loop=()=>{if(!dg||!dg.active)return;const h=innerHeight;if(lastY<90)scrollBy(0,-14);else if(lastY>h-170&&lastY<h-90)scrollBy(0,14);raf=requestAnimationFrame(loop)};raf=requestAnimationFrame(loop);
+    const loop=()=>{if(!dg||!dg.active)return;const h=innerHeight,sc=document.querySelector('.sheet')||window,by=d=>sc===window?scrollBy(0,d):(sc.scrollTop+=d);if(lastY<90)by(-14);else if(lastY>h-110)by(14);raf=requestAnimationFrame(loop)};raf=requestAnimationFrame(loop);
   }
   document.addEventListener('pointerdown',e=>{
     if(e.target.closest('.chk,.swdel,input,textarea,a,select'))return;
@@ -878,6 +900,8 @@ let swJust=false;
     const t=dropOf(e.clientX,e.clientY),kind=dg.kind,id=dg.id;
     cleanup();swJust=true;setTimeout(()=>{swJust=false},120);
     if(!t)return;const date=t.getAttribute('data-drop');
+    if(date.startsWith('ptype:')){convertTo(kind,id,date.slice(6));return}
+    if(kind==='o')return;
     if(kind==='e'){if(!date){toast('Un événement a besoin d’une date');return}
       const ev=S.events.find(x=>x.id===id);if(!ev||ev.date===date)return;hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[];ev.date=date;}
     else{const n=S.notes.find(x=>x.id===id);if(!n||(n.due||'')===date)return;hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[];n.due=date;if(date)n.inbox=false}

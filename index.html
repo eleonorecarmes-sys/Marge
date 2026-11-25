@@ -283,7 +283,7 @@ function seed(){
 }
 let S=load()||seed();
 const ACCENTS=[['marine','Marine','#1b3a6b','#8fb2ee'],['bleu','Bleu','#1f5fbf','#7fb0f5'],['sapin','Vert sapin','#1f6f5c','#5fc2a5'],['prune','Prune','#6a3b6e','#c79bd0'],['bordeaux','Bordeaux','#8a2f3f','#e59aa6'],['ardoise','Ardoise','#3c4658','#aab6cc']];
-const DEF_SET={accent:'marine',theme:'light',editTemplates:true,modules:{agenda:true,notes:true,class:true,msgs:true,avant:true,photos:true,pupilNotes:true}};
+const DEF_SET={accent:'marine',theme:'light',editTemplates:true,modules:{agenda:true,notes:true,class:true,msgs:false,ideas:true,res:true,avant:true,photos:true,pupilNotes:true}};
 const TEMPLATES=[
  ['Absence d’un élève','Bonjour,\n\nJe vous remercie de m’avoir prévenue de l’absence de {prénom}. Je lui ferai passer le travail vu en classe dès son retour.\n\nCordialement,'],
  ['Demande de rendez-vous','Bonjour,\n\nJe souhaiterais vous rencontrer au sujet de {prénom}. Seriez-vous disponible cette semaine, par exemple après la classe ?\n\nCordialement,'],
@@ -297,7 +297,7 @@ function ensure(){
   if(!S.templates)S.templates=TEMPLATES.map(t=>({id:uid(),title:t[0],text:t[1]}));
   if(!S.subjects)S.subjects=DEF_SUBJECTS.map(x=>({...x}));
   S.notes.forEach(n=>{if(n.subject===undefined)n.subject='';if(n.pupilId===undefined)n.pupilId='';if(n.inbox===undefined)n.inbox=false;n.before=false});
-  if(!S.recurring)S.recurring=[];
+  if(!S.recurring)S.recurring=[];if(typeof S.ideas!=='string')S.ideas='';if(!S.res)S.res=[];
   genRecurring();
 }
 function blank(){return {v:2,demo:false,notes:[],events:[],pupils:[],className:S.className||'Ma classe',settings:S.settings,templates:S.templates,subjects:S.subjects,recurring:S.recurring||[]}}
@@ -311,7 +311,7 @@ function applyTheme(){
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#13141b':'#ffffff';
 }
 
-let openColor='',hist=[],redo=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
+let openColor='',hist=[],redo=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',qRes='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function setView(v){if(v==='today'&&view==='today')tDay=ymd(new Date());view=v;sheet=null;render();window.scrollTo(0,0)}
 const subj=id=>S.subjects.find(x=>x.id===id);
@@ -462,10 +462,11 @@ function vPhotos(){
 }
 function vClass(){
   const M=S.settings.modules;
-  const modes=[];if(M.class)modes.push(['eleves','Élèves']);if(M.msgs)modes.push(['msgs','Messages']);if(M.photos)modes.push(['photos','Photos']);
+  const modes=[];if(M.class)modes.push(['eleves','Élèves']);if(M.ideas)modes.push(['ideas','Idées']);if(M.res)modes.push(['res','Ressources']);if(M.photos)modes.push(['photos','Photos']);
   if(!modes.some(m=>m[0]===classMode))classMode=modes[0]?modes[0][0]:'eleves';
   const seg=modes.length>1?`<div class="seg" style="margin:4px 0 12px">${modes.map(([k,l])=>`<button class="${classMode===k?'on':''}" data-act="cmode" data-v="${k}">${l}</button>`).join('')}</div>`:'';
-  if(classMode==='msgs')return seg+vMsgs();
+  if(classMode==='ideas')return seg+vIdeas();
+  if(classMode==='res')return seg+vRes();
   if(classMode==='photos')return seg+vPhotos();
   const pn=M.pupilNotes;
   let h=seg+`<div class="top"><div><h1>${esc(S.className||'Ma classe')}</h1><p class="sub">${S.pupils.length} élève${S.pupils.length>1?'s':''} · prénoms ou initiales seulement</p></div>${gear()}</div>`;
@@ -474,6 +475,20 @@ function vClass(){
   return h;
 }
 
+function vIdeas(){
+  return `<div class="top"><div><h1>Idées</h1><p class="sub">Les idées et propositions de tes élèves.</p></div>${gear()}</div><div class="field"><textarea id="idt" style="min-height:340px" placeholder="Écris ou dicte une idée par ligne…">${esc(S.ideas)}</textarea></div>`;
+}
+function vRes(){
+  const q=norm(qRes.trim());
+  let list=S.res.slice().sort((a,b)=>b.ts-a.ts);
+  if(q)list=list.filter(r=>norm(r.desc+' '+(subj(r.subject)?subj(r.subject).name:'')+' '+r.url).includes(q));
+  let h=`<div class="top"><div><h1>Ressources</h1><p class="sub">${S.res.length} lien${S.res.length>1?'s':''} gardé${S.res.length>1?'s':''}</p></div>${gear()}</div>
+  <div class="search">${ICONS.search}<input id="qr" type="search" placeholder="Chercher une ressource…" value="${esc(qRes)}" autocomplete="off"></div>
+  <button class="addrow" data-act="addRes" aria-label="Ajouter une ressource">${ICONS.plus}</button>`;
+  if(!list.length)return h+'<div class="empty">'+(S.res.length?'Rien trouvé.':'Colle ici les liens des sites où tu trouves des ressources.')+'</div>';
+  return h+list.map(r=>{const sj=subj(r.subject);let host=r.url;try{host=new URL(/^https?:/.test(r.url)?r.url:'https://'+r.url).hostname.replace(/^www\./,'')}catch(e){}
+    return `<div class="item" style="--c:${sj?sj.color:NEUTRAL}"><button class="body" data-act="editRes" data-id="${r.id}"><div class="txt">${esc(r.desc||host)}</div><div class="pills">${sj?`<span class="pill" style="--c:${sj.color}">${esc(sj.name)}</span>`:''}<span class="pill plain">${esc(host)}</span></div></button><a class="btn ghost" style="flex:none;align-self:center;margin-right:10px;min-height:38px;text-decoration:none" href="${esc(/^https?:/.test(r.url)?r.url:'https://'+r.url)}" target="_blank" rel="noopener">Ouvrir</a></div>`}).join('');
+}
 function vMsgs(){
   const ed=S.settings.editTemplates;
   let h=`<div class="top"><div><h1>Messages</h1><p class="sub">Des modèles à copier pour répondre vite aux familles.</p></div>${gear()}</div>
@@ -488,7 +503,7 @@ function vSettings(){
   const sw=(on,attr)=>`<button class="switch ${on?'on':''}" role="switch" aria-checked="${on}" ${attr}></button>`;
   const mod=(k,l,d)=>`<div class="setrow"><div class="main"><b>${l}</b><small>${d}</small></div>${sw(m[k],`data-act="mod" data-v="${k}" aria-label="${l}"`)}</div>`;
   const soon=(l,d)=>`<div class="setrow soon"><div class="main"><b>${l}</b><small>${d}</small></div><span class="badge">Bientôt</span></div>`;
-  const tabs=[['app','Apparence'],['subj','Matières'],['fn','Fonctions'],['rec','Récurrentes'],['msg','Messages'],['data','Données']];
+  const tabs=[['app','Apparence'],['subj','Matières'],['fn','Fonctions'],['rec','Récurrentes'],['data','Données']];
   const intro={app:'La couleur de l’appli, le mode clair ou sombre et le nom de ta classe.',subj:'Les matières et leur couleur, pour classer tes tâches.',fn:'Choisis ce qui apparaît dans Marge. Ce que tu désactives disparaît des onglets.',rec:'Des tâches qui reviennent toutes seules chaque semaine dans « À faire ».',msg:'Les modèles de messages aux parents.',data:'Tout reste sur cet appareil. Rien n’est envoyé sur Internet.'};
   let b='';
   if(setTab==='app')b=card(`<div class="setrow" style="flex-wrap:wrap;gap:6px;justify-content:space-between">${ACCENTS.map(a=>`<button class="sw ${st.accent===a[0]?'on':''}" data-act="accent" data-v="${a[0]}" aria-label="${a[1]}"><i style="background:${a[2]}"></i></button>`).join('')}</div>
@@ -499,7 +514,8 @@ function vSettings(){
     mod('notes','À faire','Tes notes et tâches, triées par matière')+
     mod('class','Classe','La liste des élèves')+
     mod('pupilNotes','Notes de suivi par élève','Une petite fiche pour chaque élève')+
-    mod('msgs','Messages aux parents','Des modèles à copier')+
+    mod('ideas','Idées','Une zone de texte pour les idées de tes élèves')+
+    mod('res','Ressources','Garder les liens des sites utiles, par matière')+
     mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))+`<h2>Idées pour plus tard</h2>`+card(soon('Notifications qui sonnent','Des rappels même quand l’appli est fermée')+soon('Synchro entre appareils','Ordinateur, tablette et téléphone')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier'))+'<p class="hint">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>';
   if(setTab==='rec')b=card(S.recurring.map(r=>`<div class="setrow"><div class="main"><b>${esc(r.text)}</b><small>Tous les ${JOURS[r.day]}s</small></div><button class="iconbtn" data-act="delRec" data-id="${r.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow" style="display:block"><input id="rt" placeholder="Ex. Faire l’agenda en ligne" value="${esc(recDraft.text)}" autocomplete="off"><div class="chips" style="margin:10px 0">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${recDraft.day===d?'on':''}" data-act="recday" data-v="${d}">${JOURS[d].slice(0,3)}.</button>`).join('')}</div><button class="btn block" data-act="addRec">Ajouter</button></div>`);
   if(setTab==='msg')b=card(`<div class="setrow"><div class="main"><b>Autoriser la modification des modèles</b><small>Modifier, ajouter ou supprimer tes modèles de messages</small></div>${sw(st.editTemplates,'data-act="opt" data-v="editTemplates" aria-label="Modifier les modèles"')}</div>`)+(m.msgs?'<button class="btn ghost block" style="margin-top:12px" data-act="gomsgs">Ouvrir mes modèles</button>':'');
@@ -512,12 +528,12 @@ function vSettings(){
 function render(){
   swOpen=null;
   const m=S.settings.modules;
-  if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.msgs&&!m.photos))view='today';
+  if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.ideas&&!m.res&&!m.photos))view='today';
   $('#app').innerHTML={today:vToday,agenda:vAgenda,todo:vTodo,class:vClass,settings:vSettings}[view]();
   const tabs=[['today','Aujourd’hui']];
   if(m.agenda)tabs.push(['agenda','Agenda']);
   if(m.notes)tabs.push(['todo','À faire']);
-  if(m.class||m.msgs||m.photos)tabs.push(['class',m.class?'Classe':(m.msgs?'Messages':'Photos')]);
+  if(m.class||m.ideas||m.res||m.photos)tabs.push(['class','Classe']);
   tabs.splice(Math.ceil(tabs.length/2),0,['add','']);
   $('#nav').style.gridTemplateColumns='repeat('+tabs.length+',1fr)';
   $('#nav').innerHTML=tabs.map(([k,l])=>k==='add'?`<button class="plus" data-act="capture" aria-label="Noter vite"><span>${ICONS.plus}</span></button>`:`<button class="${view===k?'on':''}" data-act="view" data-v="${k}">${ICONS[k==='class'&&!m.class?'msgs':k]}${l}</button>`).join('');
@@ -621,6 +637,13 @@ function renderSheet(){
     <button class="btn block" data-act="savePupilNote" data-id="${p.id}">Enregistrer</button>
     ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneT.map(n=>itemRow(n)).join(''):''}`:''}
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button><button class="btn ghost block" data-act="close">Fermer</button></div>`;
+  }else if(sheet.type==='res'){
+    const r=sheet.d;
+    body=`<div class="grab"></div><h3>${r.id?'Modifier la ressource':'Nouvelle ressource'}</h3>
+    <div class="field"><label for="ru">Lien</label><input id="ru" type="url" inputmode="url" value="${esc(r.url)}" placeholder="Colle le lien ici" autocomplete="off"></div>
+    <div class="field"><label for="rd">Description rapide</label><input id="rd" value="${esc(r.desc)}" placeholder="Ex. fiches de calcul mental CM1" autocomplete="off"></div>
+    <div class="field"><label>Matière</label><div class="chips"><button class="chip ${!r.subject?'on':''}" data-act="rsub" data-v="">Aucune</button>${S.subjects.map(x=>`<button class="chip c ${r.subject===x.id?'on':''}" style="--c:${x.color}" data-act="rsub" data-v="${x.id}"><i></i>${esc(x.name)}</button>`).join('')}</div></div>
+    <div style="display:flex;gap:10px;margin-top:20px">${r.id?'<button class="btn danger" data-act="delRes">Supprimer</button>':'<button class="btn ghost" data-act="close">Annuler</button>'}<button class="btn block" data-act="saveRes">Enregistrer</button></div>`;
   }else if(sheet.type==='tpl'){
     const t=sheet.d;
     body=`<div class="grab"></div><h3>${t.id?'Modifier le modèle':'Nouveau modèle'}</h3>
@@ -654,6 +677,12 @@ function icsOf(e,rep){
 }
 const ACT={
   view:v=>setView(v),
+  addRes:()=>{openSheet({type:'res',d:{url:'',desc:'',subject:''}});setTimeout(()=>{const c=$('#ru');c&&c.focus()},60)},
+  editRes:(v,id)=>{const r=S.res.find(x=>x.id===id);if(r)openSheet({type:'res',d:{...r}})},
+  rsub:v=>{const r=sheet.d;r.url=$('#ru').value;r.desc=$('#rd').value;r.subject=v;renderSheet()},
+  saveRes:()=>{const r=sheet.d;r.url=$('#ru').value.trim();r.desc=$('#rd').value.trim();if(!r.url){toast('Colle un lien d’abord');return}
+    if(r.id){const i=S.res.findIndex(x=>x.id===r.id);S.res[i]={...r}}else S.res.push({...r,id:uid(),ts:Date.now()});persist();sheet=null;render();toast('Ressource gardée')},
+  delRes:()=>{S.res=S.res.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()},
   cmode:v=>{classMode=v;render()},
   settings:()=>setView('settings'),
   close:()=>closeSheet(),
@@ -780,7 +809,7 @@ function doCopy(id,share){
   if(share&&navigator.share){navigator.share({text:txt}).catch(()=>{});return}
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copié')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copié')}catch(e){toast('Copie impossible')}ta.remove()});
 }
-const MUT=new Set(['reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
+const MUT=new Set(['saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
 function closeSw(){if(swOpen){swOpen.classList.remove('open');const i=swOpen.lastElementChild;if(i)i.style.transform='';swOpen=null}}
 (function(){
@@ -810,6 +839,8 @@ document.addEventListener('input',ev=>{
   const t=ev.target;
   if(t.id==='q')keepFocus('q',t.value,v=>qToday=v);
   else if(t.id==='qt')keepFocus('qt',t.value,v=>qTodo=v);
+  else if(t.id==='qr')keepFocus('qr',t.value,v=>qRes=v);
+  else if(t.id==='idt'){S.ideas=t.value;persist()}
   else if(t.id==='who')keepFocus('who',t.value,v=>window._who=v);
   else if(t.id==='gq'){sheet.q=t.value;$('#gres').innerHTML=resHTML(t.value.trim())}
   else if(t.id==='cn'){S.className=t.value;persist()}

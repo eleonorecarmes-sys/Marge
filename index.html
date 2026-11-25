@@ -207,21 +207,27 @@ const KEYWORDS={francais:/francais|lecture|dictee|ecriture|grammaire|conjugaison
 const REM=[['','Aucun'],['0','Le jour même'],['1','1 jour avant'],['2','2 jours avant'],['3','3 jours avant'],['7','1 semaine avant']];
 const NUMW={un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7};
 function parseWhen(text){
-  const t=norm(text),now=new Date(),r={date:'',time:''};let m;
-  if(m=t.match(/\b(\d{1,2})\s?h\s?(\d{2})?\b/))r.time=pad(+m[1])+':'+(m[2]||'00');
+  const t=norm(text),now=new Date(),r={date:'',time:'',dateSpans:[],timeSpans:[]};let m;
   const wd=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
   const mo=['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
   const t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const dm=(day,mi)=>{let d=new Date(now.getFullYear(),mi,day);if(d<t0)d=new Date(now.getFullYear()+1,mi,day);return ymd(d)};
-  if(/apres[ -]?demain/.test(t))r.date=ymd(addDays(now,2));
-  else if(/\bdemain\b/.test(t))r.date=ymd(addDays(now,1));
-  else if(/aujourd|ce soir|ce matin|cet apres/.test(t))r.date=ymd(now);
-  else if(m=t.match(/dans (\d+|un|une|deux|trois|quatre|cinq|six|sept) jours?/))r.date=ymd(addDays(now,+m[1]||NUMW[m[1]]));
-  else if(m=t.match(/\b(\d{1,2})(?:er)?\s+(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\b/))r.date=dm(+m[1],mo.indexOf(m[2]));
-  else if((m=t.match(/\b(\d{1,2})\/(\d{1,2})\b/))&&+m[2]>=1&&+m[2]<=12)r.date=dm(+m[1],+m[2]-1);
-  else if(m=t.match(/\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/)){let n=(wd.indexOf(m[1])-now.getDay()+7)%7;if(n===0)n=7;r.date=ymd(addDays(now,n))}
-  else if(/semaine prochaine/.test(t))r.date=ymd(addDays(now,((8-now.getDay())%7)||7));
+  if(m=t.match(/\b(?:(?:a|vers|pour)\s+)?(\d{1,2})\s?h\s?(\d{2})?\b/)){r.time=pad(+m[1])+':'+(m[2]||'00');r.timeSpans.push([m.index,m[0].length])}
+  const T=(re,fn)=>{const x=t.match(re);if(!x)return false;if(fn(x)===false)return false;r.dateSpans.push([x.index,x[0].length]);return true};
+  T(/\b(?:pour\s+)?apres[ -]?demain\b/,()=>{r.date=ymd(addDays(now,2))})
+  ||T(/\b(?:pour\s+)?demain(?:\s+(?:matin|soir|apres[- ]midi))?\b/,()=>{r.date=ymd(addDays(now,1))})
+  ||T(/\b(?:pour\s+)?(?:aujourd.?hui|ce soir|ce matin|cet apres[- ]midi)\b/,()=>{r.date=ymd(now)})
+  ||T(/\bdans (\d+|un|une|deux|trois|quatre|cinq|six|sept) jours?\b/,x=>{r.date=ymd(addDays(now,+x[1]||NUMW[x[1]]))})
+  ||T(/\b(?:(?:pour|avant|vers)\s+)?(?:le\s+)?(\d{1,2})(?:er)?\s+(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\b/,x=>{r.date=dm(+x[1],mo.indexOf(x[2]))})
+  ||T(/\b(?:(?:pour|avant|vers)\s+)?(?:le\s+)?(\d{1,2})\/(\d{1,2})\b/,x=>{if(+x[2]<1||+x[2]>12)return false;r.date=dm(+x[1],+x[2]-1)})
+  ||T(/\b(?:(?:pour|avant|vers)\s+)?(?:(?:ce|le)\s+)?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)(?:\s+prochain)?\b/,x=>{let n=(wd.indexOf(x[1])-now.getDay()+7)%7;if(n===0)n=7;r.date=ymd(addDays(now,n))})
+  ||T(/\b(?:pour\s+)?(?:la\s+)?semaine prochaine\b/,()=>{r.date=ymd(addDays(now,((8-now.getDay())%7)||7))});
   return r;
+}
+function cutText(text,spans){
+  let x=text;[...spans].sort((a,b)=>b[0]-a[0]).forEach(([i,l])=>{x=x.slice(0,i)+' '+x.slice(i+l)});
+  x=x.replace(/\s{2,}/g,' ').replace(/\s+([,.;:!?])/g,'$1').trim().replace(/(?:\s+(?:le|la|à|a|pour|avant|vers|de|du|ce|cet|et))+[,.]?$/i,'').replace(/^[,.;:\s]+|[,;:\s]+$/g,'').trim();
+  return x?x.charAt(0).toUpperCase()+x.slice(1):'';
 }
 function applyDate(d,date){if(!date)return;if(date===ymd(new Date())){d.when='today';d.date=''}else if(date===ymd(addDays(new Date(),1))){d.when='tomorrow';d.date=''}else{d.when='';d.date=date}}
 function genRecurring(){const t=new Date();let ch=false;(S.recurring||[]).forEach(r=>{r.gen=r.gen||[];for(let i=0;i<14;i++){const d=addDays(t,i),k=ymd(d);if(d.getDay()===r.day&&!r.gen.includes(k)){S.notes.unshift({id:uid(),text:r.text,tag:'autre',ts:Date.now(),before:false,done:false,due:k,photo:null,subject:r.subject||'',pupilId:'',inbox:false,recId:r.id});r.gen.push(k);ch=true}}});if(ch)persist()}
@@ -311,7 +317,7 @@ function autoSort(text){
   else if(/collegue|atsem|aesh/.test(t))r.tag='collegue';
   else if(!r.tag&&/eleve|devoirs|cahier/.test(t))r.tag='eleve';
   for(const s of S.subjects){const k=KEYWORDS[s.id];if((k&&k.test(t))||(norm(s.name).length>3&&t.includes(norm(s.name)))){r.subject=s.id;break}}
-  {const w=parseWhen(text);r.date=w.date;r.time=w.time}
+  {const w=parseWhen(text);r.date=w.date;r.time=w.time;r.dateSpans=w.dateSpans;r.timeSpans=w.timeSpans}
   return r;
 }
 function dueFor(w){const t=new Date();return w==='today'?ymd(t):w==='tomorrow'?ymd(addDays(t,1)):w==='week'?ymd(addDays(t,((5-t.getDay()+7)%7)||1)):''}
@@ -608,9 +614,9 @@ const ACT={
   saveNote:()=>{
     readNote();const d=sheet.d;
     if(!d.text.trim()&&!d.photo){toast('Écris quelques mots d’abord');return}
-    const isNew=!d.id,txt=d.text.trim()||'Photo';
+    const isNew=!d.id,g=autoSort(d.text);
+    if(isNew&&!d.evTouched&&!d.isEvent&&g.time){d.isEvent=true;d.todo=false;if(!d.when&&!d.date&&!g.date)applyDate(d,ymd(new Date()))}
     const manual=!!(d.subject||d.pupilId||d.when||d.date||d.isEvent);
-    const g=autoSort(d.text);
     if(!d.pupilId&&g.pupilId)d.pupilId=g.pupilId;
     if(!d.tag||d.tag==='autre')d.tag=g.tag||'autre';
     let autoDate=false;
@@ -618,18 +624,20 @@ const ACT={
     if(d.isEvent&&!d.time&&g.time)d.time=g.time;
     const due=d.date?d.date:dueFor(d.when);
     if(d.isEvent&&!due){toast('Choisis une date pour l’événement');return}
+    const cuts=[];if(autoDate)cuts.push(...g.dateSpans);if(d.isEvent&&g.time&&d.time===g.time)cuts.push(...g.timeSpans);
+    const txt=(cuts.length?cutText(d.text,cuts):d.text.trim())||d.text.trim()||'Photo';
     const keep=!d.isEvent||d.todo,rem=d.remind===''?'':+d.remind;
     const base={text:txt,tag:d.tag,subject:d.subject,pupilId:d.pupilId,before:false,due,photo:d.photo,inbox:!(manual||autoDate),remind:d.isEvent?'':rem};
     let msg=base.inbox?'Gardé dans « À trier »':'Noté et rangé';
     if(autoDate)msg='Date reconnue : '+frDate(fromYmd(due));
-    if(d.isEvent){const k=norm(txt);S.events.push({id:uid(),title:txt,date:due,time:d.time||'',kind:/reunion|conseil/.test(k)?'reunion':/rdv|rendez/.test(k)?'rdv':/date limite|rendre|avant le/.test(k)?'echeance':'autre',remind:rem});agSel=due;msg='Ajouté à l’agenda'}
+    if(d.isEvent){const k=norm(d.text);S.events.push({id:uid(),title:txt,date:due,time:d.time||'',kind:/reunion|conseil/.test(k)?'reunion':/rdv|rendez/.test(k)?'rdv':/date limite|rendre|avant le/.test(k)?'echeance':'autre',remind:rem});agSel=due;msg='Ajouté à l’agenda : '+frDate(fromYmd(due))+(d.time?' à '+d.time:'')}
     if(d.repeat&&due&&isNew){S.recurring.push({id:uid(),text:txt,day:fromYmd(due).getDay(),subject:d.subject,gen:[due]});msg='Noté, chaque semaine'}
     if(!isNew){const n=S.notes.find(x=>x.id===d.id);if(n){Object.assign(n,base);syncPupil(n)}msg=base.inbox?'Gardée dans « À trier »':'Rangée'}
     else if(keep){const n={id:uid(),ts:Date.now(),done:false,...base};S.notes.unshift(n);syncPupil(n)}
     toast(msg);persist();sheet=null;render();
   },
-  tgTodo:()=>{readNote();const d=sheet.d;d.todo=!d.todo;if(!d.todo&&!d.isEvent)d.isEvent=true;renderSheet()},
-  tgEvent:()=>{readNote();const d=sheet.d;d.isEvent=!d.isEvent;if(!d.isEvent)d.todo=true;renderSheet()},
+  tgTodo:()=>{readNote();const d=sheet.d;d.evTouched=true;d.todo=!d.todo;if(!d.todo&&!d.isEvent)d.isEvent=true;renderSheet()},
+  tgEvent:()=>{readNote();const d=sheet.d;d.evTouched=true;d.isEvent=!d.isEvent;if(!d.isEvent)d.todo=true;renderSheet()},
   setRemind:v=>{readNote();sheet.d.remind=v;renderSheet()},
   tgRepeat:()=>{readNote();sheet.d.repeat=!sheet.d.repeat;renderSheet()},
   erem:v=>{const e=sheet.d;e.title=$('#et').value;e.date=$('#ed').value;e.time=$('#eh').value;e.remind=v;renderSheet()},

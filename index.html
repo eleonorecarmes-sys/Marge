@@ -54,7 +54,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .item .body{flex:1;min-width:0}
 .item .txt{overflow-wrap:anywhere;font-size:16px}
 .item.done .txt{text-decoration:line-through;color:var(--muted)}
-.item.done{opacity:.65}
+.item.done .body,.item.done .chk{opacity:.6}
 .item.inbox{background:var(--accent-soft);border-style:dashed;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));border-left:5px dashed color-mix(in srgb,var(--accent) 60%,transparent)}
 .chk{width:26px;height:26px;border-radius:50%;border:2px solid var(--c,#8a94a6);flex:none;display:grid;place-items:center;background:transparent;margin-top:1px}
 .chk.on{background:var(--c,#8a94a6)}
@@ -155,6 +155,10 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
 .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.gal button{aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--soft)}.gal img{width:100%;height:100%;object-fit:cover;display:block}
 .addrow{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:46px;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:14px;color:var(--accent);font-weight:700;margin:2px 0 6px;text-align:center}
+.swipe{position:relative;margin-bottom:8px;border-radius:14px;overflow:hidden}
+.swipe .item,.swipe .evc{margin-bottom:0;position:relative;transition:transform .18s ease;touch-action:pan-y}
+.swipe.moving .item,.swipe.moving .evc{transition:none}
+.swdel{position:absolute;right:0;top:0;bottom:0;width:92px;background:var(--danger);color:#fff;font-weight:700;display:grid;place-items:center;text-align:center;font-size:14px}
 </style>
 </head>
 <body>
@@ -194,7 +198,8 @@ const ICONS={
  cam:sv('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
  gear:sv('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
  back:sv('<path d="M15 5l-7 7 7 7"/>'),
- chev:sv('<path d="M9 5l7 7-7 7"/>')
+ chev:sv('<path d="M9 5l7 7-7 7"/>'),
+ undo:sv('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>')
 };
 const TAGS=[['parent','Parent'],['collegue','Collègue'],['direction','Direction'],['eleve','Élève'],['autre','Autre']];
 const tagLabel=k=>(TAGS.find(t=>t[0]===k)||TAGS[4])[1];
@@ -300,7 +305,7 @@ function applyTheme(){
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#13141b':'#ffffff';
 }
 
-let tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
+let hist=[],swOpen=null,setTab='app',tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
 function setView(v){if(v==='today'&&view==='today')tDay=ymd(new Date());view=v;sheet=null;render();window.scrollTo(0,0)}
 const subj=id=>S.subjects.find(x=>x.id===id);
@@ -340,7 +345,7 @@ function searchAll(q){const k=norm(q);return{
   pupils:S.pupils.filter(p=>norm(p.name).includes(k)||p.notes.some(x=>norm(x.text).includes(k)))}}
 
 const card=h=>`<div class="card">${h}</div>`;
-const gear=()=>`<button class="iconbtn" data-act="settings" aria-label="Réglages">${ICONS.gear}</button>`;
+const gear=()=>`<div style="display:flex;align-items:center;flex:none"><button class="iconbtn" data-act="gsearch" aria-label="Rechercher">${ICONS.search}</button>${hist.length?`<button class="iconbtn" data-act="undo" aria-label="Annuler la dernière action">${ICONS.undo}</button>`:''}<button class="iconbtn" data-act="settings" aria-label="Réglages">${ICONS.gear}</button></div>`;
 function dueLabel(n){
   if(n.done||n.inbox)return '';
   const today=ymd(new Date());
@@ -352,16 +357,16 @@ function dueLabel(n){
 }
 function itemRow(n,q=''){
   const s=subj(n.subject),p=pupil(n.pupilId),c=colorOf(n);
-  return `<div class="item ${n.done?'done':''} ${n.inbox&&!n.done?'inbox':''}" style="--c:${c}">
+  return `<div class="swipe"><button class="swdel" data-act="delQuick" data-id="${n.id}">Supprimer</button><div class="item ${n.done?'done':''} ${n.inbox&&!n.done?'inbox':''}" style="--c:${c}">
     <button class="chk ${n.done?'on':''}" data-act="toggle" data-id="${n.id}" aria-label="Fait">${ICONS.check}</button>
     <button class="body" data-act="openNote" data-id="${n.id}">
       <div class="txt">${hl(n.text,q)}</div>
       <div class="pills">${n.inbox&&!n.done?'<span class="pill" style="--c:var(--accent)">à trier</span>':''}${p?`<span class="pill plain">${ICONS.person}${esc(p.name)}</span>`:''}${s?`<span class="pill">${esc(s.name)}</span>`:''}${dueLabel(n)}</div>
-    </button>${n.photo?`<img class="thumb" src="${n.photo}" alt="">`:''}</div>`;
+    </button>${n.photo?`<img class="thumb" src="${n.photo}" alt="">`:''}</div></div>`;
 }
 function eventCard(e,q=''){
   const [lab,c]=EV[e.kind]||EV.autre;
-  return `<button class="evc" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><div class="evt ${e.time?'':'day'}">${e.time||'Jour'}</div><div class="evb"><b>${hl(e.title,q)}</b><span>${lab}${pupil(e.pupilId)?' · '+esc(pupil(e.pupilId).name):''}${e.date!==ymd(new Date())?' · '+frDate(fromYmd(e.date)):''}</span></div></button>`;
+  return `<div class="swipe"><button class="swdel" data-act="delQuickE" data-id="${e.id}">Supprimer</button><button class="evc" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><div class="evt ${e.time?'':'day'}">${e.time||'Jour'}</div><div class="evb"><b>${hl(e.title,q)}</b><span>${lab}${pupil(e.pupilId)?' · '+esc(pupil(e.pupilId).name):''}${e.date!==ymd(new Date())?' · '+frDate(fromYmd(e.date)):''}</span></div></button></div>`;
 }
 
 function vToday(){
@@ -476,27 +481,29 @@ function vSettings(){
   const sw=(on,attr)=>`<button class="switch ${on?'on':''}" role="switch" aria-checked="${on}" ${attr}></button>`;
   const mod=(k,l,d)=>`<div class="setrow"><div class="main"><b>${l}</b><small>${d}</small></div>${sw(m[k],`data-act="mod" data-v="${k}" aria-label="${l}"`)}</div>`;
   const soon=(l,d)=>`<div class="setrow soon"><div class="main"><b>${l}</b><small>${d}</small></div><span class="badge">Bientôt</span></div>`;
-  return `<div class="top"><div><h1>Réglages</h1><p class="sub">Marge s’adapte à ta façon de travailler.</p></div></div>
-  <h2>Couleur</h2>${card(`<div class="setrow" style="flex-wrap:wrap;gap:6px;justify-content:space-between">${ACCENTS.map(a=>`<button class="sw ${st.accent===a[0]?'on':''}" data-act="accent" data-v="${a[0]}" aria-label="${a[1]}"><i style="background:${a[2]}"></i></button>`).join('')}</div>
-    <div class="setrow"><div class="main"><b>Apparence</b></div><div class="seg"><button class="${st.theme==='light'?'on':''}" data-act="th" data-v="light">Clair</button><button class="${st.theme==='dark'?'on':''}" data-act="th" data-v="dark">Sombre</button><button class="${st.theme==='auto'?'on':''}" data-act="th" data-v="auto">Auto</button></div></div>`)}
-  <h2>Mes matières</h2><p class="hint" style="margin:-4px 2px 10px">Une couleur par matière. Touche la pastille pour la changer.</p>${card(S.subjects.map(s=>`<div class="setrow"><button class="dotbtn" style="--c:${s.color}" data-act="cycleColor" data-id="${s.id}" aria-label="Changer la couleur"></button><input class="sname" data-sname="${s.id}" value="${esc(s.name)}" autocomplete="off"><button class="iconbtn" data-act="delSubject" data-id="${s.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow"><button class="link" data-act="addSubject">+ Ajouter une matière</button></div>`)}
-  <h2>Ce que tu veux dans Marge</h2>${card(
+  const tabs=[['app','Apparence'],['subj','Matières'],['fn','Fonctions'],['rec','Récurrentes'],['msg','Messages'],['data','Données']];
+  const intro={app:'La couleur de l’appli, le mode clair ou sombre et le nom de ta classe.',subj:'Les matières et leur couleur, pour classer tes tâches.',fn:'Choisis ce qui apparaît dans Marge. Ce que tu désactives disparaît des onglets.',rec:'Des tâches qui reviennent toutes seules chaque semaine dans « À faire ».',msg:'Les modèles de messages aux parents.',data:'Tout reste sur cet appareil. Rien n’est envoyé sur Internet.'};
+  let b='';
+  if(setTab==='app')b=card(`<div class="setrow" style="flex-wrap:wrap;gap:6px;justify-content:space-between">${ACCENTS.map(a=>`<button class="sw ${st.accent===a[0]?'on':''}" data-act="accent" data-v="${a[0]}" aria-label="${a[1]}"><i style="background:${a[2]}"></i></button>`).join('')}</div>
+    <div class="setrow"><div class="main"><b>Apparence</b></div><div class="seg"><button class="${st.theme==='light'?'on':''}" data-act="th" data-v="light">Clair</button><button class="${st.theme==='dark'?'on':''}" data-act="th" data-v="dark">Sombre</button><button class="${st.theme==='auto'?'on':''}" data-act="th" data-v="auto">Auto</button></div></div>`)+`<h2>Nom de la classe</h2><input id="cn" value="${esc(S.className||'')}" placeholder="Nom de la classe" autocomplete="off">`;
+  if(setTab==='subj')b=card(S.subjects.map(s=>`<div class="setrow"><button class="dotbtn" style="--c:${s.color}" data-act="cycleColor" data-id="${s.id}" aria-label="Changer la couleur"></button><input class="sname" data-sname="${s.id}" value="${esc(s.name)}" autocomplete="off"><button class="iconbtn" data-act="delSubject" data-id="${s.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow"><button class="link" data-act="addSubject">+ Ajouter une matière</button></div>`)+'<p class="hint">Touche la pastille de couleur pour la changer.</p>';
+  if(setTab==='fn')b=card(
     mod('agenda','Agenda','Semaine, mois, événements et dates limites')+
     mod('notes','À faire','Tes notes et tâches, triées par matière')+
     mod('class','Classe','La liste des élèves')+
     mod('pupilNotes','Notes de suivi par élève','Une petite fiche pour chaque élève')+
     mod('msgs','Messages aux parents','Des modèles à copier')+
-    mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))}
-  <h2>Tâches récurrentes</h2><p class="hint" style="margin:-4px 2px 10px">Elles arrivent toutes seules dans « À faire » chaque semaine.</p>${card(S.recurring.map(r=>`<div class="setrow"><div class="main"><b>${esc(r.text)}</b><small>Tous les ${JOURS[r.day]}s</small></div><button class="iconbtn" data-act="delRec" data-id="${r.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow" style="display:block"><input id="rt" placeholder="Ex. Faire l’agenda en ligne" value="${esc(recDraft.text)}" autocomplete="off"><div class="chips" style="margin:10px 0">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${recDraft.day===d?'on':''}" data-act="recday" data-v="${d}">${JOURS[d].slice(0,3)}.</button>`).join('')}</div><button class="btn block" data-act="addRec">Ajouter</button></div>`)}
-  <h2>Messages aux parents</h2>${card(`<div class="setrow"><div class="main"><b>Autoriser la modification des modèles</b><small>Modifier, ajouter ou supprimer tes modèles de messages</small></div>${sw(st.editTemplates,'data-act="opt" data-v="editTemplates" aria-label="Modifier les modèles"')}</div>`)}
-  <h2>Ma classe</h2><input id="cn" value="${esc(S.className||'')}" placeholder="Nom de la classe" autocomplete="off">
-  <h2>Idées pour plus tard</h2>${card(soon('Rappels de réunion qui sonnent','Des notifications, quand tu les choisis')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier')+soon('Lien avec la boîte mail','Être prévenue d’un nouveau message'))}
-  <p class="hint" style="margin-top:8px">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>
-  <h2>Mes données</h2><p class="sub" style="margin:0 0 10px">Tout reste sur cet appareil. Rien n’est envoyé sur Internet. Pour passer sur un autre appareil : enregistre une copie, envoie-la (AirDrop, Messages…), puis restaure-la là-bas.</p>
-  <div style="display:grid;gap:10px"><button class="btn ghost block" data-act="export">Enregistrer une copie</button><label class="btn ghost block" for="imp" style="cursor:pointer">Restaurer une copie</label><input id="imp" type="file" accept=".json,application/json" class="sr"><button class="btn danger block" data-act="reset">Tout effacer</button></div>`;
+    mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))+`<h2>Idées pour plus tard</h2>`+card(soon('Notifications qui sonnent','Des rappels même quand l’appli est fermée')+soon('Synchro entre appareils','Ordinateur, tablette et téléphone')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier'))+'<p class="hint">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>';
+  if(setTab==='rec')b=card(S.recurring.map(r=>`<div class="setrow"><div class="main"><b>${esc(r.text)}</b><small>Tous les ${JOURS[r.day]}s</small></div><button class="iconbtn" data-act="delRec" data-id="${r.id}" aria-label="Supprimer">✕</button></div>`).join('')+`<div class="setrow" style="display:block"><input id="rt" placeholder="Ex. Faire l’agenda en ligne" value="${esc(recDraft.text)}" autocomplete="off"><div class="chips" style="margin:10px 0">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${recDraft.day===d?'on':''}" data-act="recday" data-v="${d}">${JOURS[d].slice(0,3)}.</button>`).join('')}</div><button class="btn block" data-act="addRec">Ajouter</button></div>`);
+  if(setTab==='msg')b=card(`<div class="setrow"><div class="main"><b>Autoriser la modification des modèles</b><small>Modifier, ajouter ou supprimer tes modèles de messages</small></div>${sw(st.editTemplates,'data-act="opt" data-v="editTemplates" aria-label="Modifier les modèles"')}</div>`)+(m.msgs?'<button class="btn ghost block" style="margin-top:12px" data-act="gomsgs">Ouvrir mes modèles</button>':'');
+  if(setTab==='data')b=`<div style="display:grid;gap:10px"><button class="btn ghost block" data-act="export">Enregistrer une copie</button><label class="btn ghost block" for="imp" style="cursor:pointer">Restaurer une copie</label><input id="imp" type="file" accept=".json,application/json" class="sr"><button class="btn danger block" data-act="reset">Tout effacer</button></div><p class="hint">Pour passer sur un autre appareil : enregistre une copie, envoie-la (AirDrop, Messages…), puis restaure-la là-bas.</p>`;
+  return `<div class="top"><div><h1>Réglages</h1></div><button class="btn ghost" data-act="view" data-v="today" style="min-height:42px">Terminé</button></div>
+  <div class="chips scroll" style="margin-top:10px">${tabs.map(([k,l])=>`<button class="chip ${setTab===k?'on':''}" data-act="stab" data-v="${k}">${l}</button>`).join('')}</div>
+  <p class="sub" style="margin:10px 0 12px">${intro[setTab]}</p>${b}`;
 }
 
 function render(){
+  swOpen=null;
   const m=S.settings.modules;
   if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.msgs&&!m.photos))view='today';
   $('#app').innerHTML={today:vToday,agenda:vAgenda,todo:vTodo,class:vClass,settings:vSettings}[view]();
@@ -510,6 +517,16 @@ function render(){
   renderSheet();
 }
 
+function resHTML(q){
+  if(!q)return '<p class="hint" style="margin-top:14px">Tape quelques lettres : une tâche, un événement ou un prénom d’élève.</p>';
+  const r=searchAll(q),total=r.notes.length+r.events.length+r.pupils.length;
+  if(!total)return '<div class="empty" style="margin-top:14px">Rien trouvé. Essaie un autre mot.</div>';
+  let h=`<h2>${total} résultat${total>1?'s':''}</h2>`;
+  if(r.events.length)h+='<h2 style="margin-top:6px">Événements</h2>'+r.events.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>eventCard(e,q)).join('');
+  if(r.notes.length)h+='<h2 style="margin-top:6px">Tâches et notes</h2>'+r.notes.map(n=>itemRow(n,q)).join('');
+  if(r.pupils.length)h+='<h2 style="margin-top:6px">Élèves</h2>'+card(r.pupils.map(p=>`<div class="setrow"><button class="main" data-act="pupil" data-id="${p.id}"><b>${hl(p.name,q)}</b><small>${p.notes.length} note${p.notes.length>1?'s':''}</small></button></div>`).join(''));
+  return h;
+}
 function openSheet(s){sheet=s;renderSheet()}
 function closeSheet(){sheet=null;renderSheet();render()}
 const WHEN=[['today','Aujourd’hui'],['tomorrow','Demain'],['week','Cette semaine']];
@@ -544,6 +561,8 @@ function renderSheet(){
     ${noteForm(d)}
     <div style="display:flex;gap:10px;margin-top:18px">${isNew?'<button class="btn ghost" data-act="close">Annuler</button>':'<button class="btn danger" data-act="delNote" data-id="'+d.id+'">Supprimer</button>'}<button class="btn block" data-act="saveNote">${isNew?'Enregistrer':(d.inbox?'Ranger':'Enregistrer')}</button></div>
     ${isNew?'':`<button class="btn ghost block" style="margin-top:10px" data-act="doneNote" data-id="${d.id}">${d.done?'Remettre à faire':'C’est fait'}</button>`}`;
+  }else if(sheet.type==='search'){
+    body=`<div class="grab"></div><h3>Rechercher</h3><div class="search">${ICONS.search}<input id="gq" type="search" placeholder="Une tâche, un événement, un élève…" autocomplete="off" value="${esc(sheet.q||'')}"></div><div id="gres">${resHTML((sheet.q||'').trim())}</div><button class="btn ghost block" style="margin-top:14px" data-act="close">Fermer</button>`;
   }else if(sheet.type==='photo'){
     const n=S.notes.find(x=>x.id===sheet.id);if(!n||!n.photo){sheet=null;L.innerHTML='';return}
     body=`<div class="grab"></div><h3>Photo</h3><img class="photo-full" src="${n.photo}" alt=""><p class="sub" style="margin-top:10px">${esc(n.text)}</p><div style="display:flex;gap:10px"><button class="btn danger" data-act="delPhoto" data-id="${n.id}">Supprimer la photo</button><button class="btn block" data-act="close">Fermer</button></div><button class="btn ghost block" style="margin-top:10px" data-act="openNote" data-id="${n.id}">Ouvrir la note</button>`;
@@ -638,6 +657,12 @@ const ACT={
     else if(keep){const n={id:uid(),ts:Date.now(),done:false,...base};S.notes.unshift(n);syncPupil(n)}
     toast(msg);persist();sheet=null;render();
   },
+  gsearch:()=>{openSheet({type:'search',q:''});setTimeout(()=>{const c=$('#gq');c&&c.focus()},60)},
+  undo:()=>{const h=hist.pop();if(h){S=JSON.parse(h);ensure();applyTheme();persist();sheet=null;render();toast('Action annulée')}},
+  delQuick:(v,id)=>{S.notes=S.notes.filter(x=>x.id!==id);S.pupils.forEach(p=>{p.notes=p.notes.filter(x=>x.noteId!==id)});persist();render();toast('Supprimée · touche ↩ pour annuler')},
+  delQuickE:(v,id)=>{S.events=S.events.filter(x=>x.id!==id);persist();render();toast('Supprimé · touche ↩ pour annuler')},
+  stab:v=>{setTab=v;render()},
+  gomsgs:()=>{classMode='msgs';setView('class')},
   tgTodo:()=>{readNote();const d=sheet.d;d.evTouched=true;d.todo=!d.todo;if(!d.todo&&!d.isEvent)d.isEvent=true;renderSheet()},
   tgEvent:()=>{readNote();const d=sheet.d;d.evTouched=true;d.isEvent=!d.isEvent;if(!d.isEvent)d.todo=true;renderSheet()},
   setRemind:v=>{readNote();sheet.d.remind=v;renderSheet()},
@@ -695,12 +720,28 @@ function doCopy(id,share){
   if(share&&navigator.share){navigator.share({text:txt}).catch(()=>{});return}
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copié')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copié')}catch(e){toast('Copie impossible')}ta.remove()});
 }
+const MUT=new Set(['toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
+let swJust=false;
+function closeSw(){if(swOpen){swOpen.classList.remove('open');const i=swOpen.lastElementChild;if(i)i.style.transform='';swOpen=null}}
+(function(){
+  let st=null;
+  document.addEventListener('pointerdown',e=>{const row=e.target.closest('.swipe');if(swOpen&&swOpen!==row&&!e.target.closest('.swdel'))closeSw();if(!row||e.target.closest('.swdel')){st=null;return}st={row,x:e.clientX,y:e.clientY,drag:false,base:row.classList.contains('open')?-92:0,v:0}});
+  document.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
+    if(!st.drag){if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.5){st.drag=true;st.row.classList.add('moving')}else if(Math.abs(dy)>10){st=null;return}}
+    if(st&&st.drag){st.v=Math.max(-92,Math.min(0,st.base+dx));st.row.lastElementChild.style.transform='translateX('+st.v+'px)'}});
+  const end=()=>{if(!st)return;if(st.drag){const o=st.v<-46;st.row.classList.remove('moving');st.row.classList.toggle('open',o);st.row.lastElementChild.style.transform=o?'translateX(-92px)':'';swOpen=o?st.row:null;swJust=true;setTimeout(()=>{swJust=false},60)}st=null};
+  document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);
+  document.addEventListener('click',e=>{if(swJust){e.stopPropagation();e.preventDefault();return}if(swOpen&&!e.target.closest('.swdel')){const r=e.target.closest('.swipe'),was=swOpen;closeSw();if(r===was){e.stopPropagation();e.preventDefault()}}},true);
+})();
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-act]');
   if(!t)return;
   const a=t.dataset.act;
   if(a==='scrim'){if(ev.target===t)closeSheet();return}
-  const f=ACT[a];if(f)f(t.dataset.v,t.dataset.id,t,ev);
+  const f=ACT[a];if(!f)return;
+  const before=MUT.has(a)?JSON.stringify(S):null;
+  f(t.dataset.v,t.dataset.id,t,ev);
+  if(before!==null&&JSON.stringify(S)!==before){hist.push(before);if(hist.length>10)hist.shift();render()}
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!sheet){genRecurring();render()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&sheet)closeSheet()});
@@ -710,6 +751,7 @@ document.addEventListener('input',ev=>{
   if(t.id==='q')keepFocus('q',t.value,v=>qToday=v);
   else if(t.id==='qt')keepFocus('qt',t.value,v=>qTodo=v);
   else if(t.id==='who')keepFocus('who',t.value,v=>window._who=v);
+  else if(t.id==='gq'){sheet.q=t.value;$('#gres').innerHTML=resHTML(t.value.trim())}
   else if(t.id==='cn'){S.className=t.value;persist()}
   else if(t.dataset&&t.dataset.sname){const s=subj(t.dataset.sname);if(s){s.name=t.value;persist()}}
 });
@@ -721,7 +763,7 @@ document.addEventListener('change',async ev=>{
   if(ev.target.id==='nd'){readNote();renderSheet()}
   if(ev.target.id==='imp'&&ev.target.files[0]){
     try{const d=JSON.parse(await ev.target.files[0].text());if(!d||!Array.isArray(d.notes))throw 0;
-      if(confirm('Remplacer les données de cet appareil par cette copie ?')){S=d;ensure();applyTheme();persist();sheet=null;view='today';render();toast('Copie restaurée')}}
+      if(confirm('Remplacer les données de cet appareil par cette copie ?')){hist.push(JSON.stringify(S));S=d;ensure();applyTheme();persist();sheet=null;view='today';render();toast('Copie restaurée')}}
     catch(e){toast('Fichier non reconnu')}
     ev.target.value='';
   }

@@ -152,6 +152,16 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .soon{opacity:.55}
 .badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--muted)}
 .link{color:var(--accent);font-weight:700;text-decoration:underline;padding:6px 0}
+.wgrid{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}.wday{min-width:0}
+@media(min-width:700px){.wgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.wday{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 10px 8px;min-height:92px;display:flex;flex-direction:column;gap:4px}
+.wday.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.wday.we{background:var(--soft)}
+.wh{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}.wh b{font-size:15px}.wday.today .wh b{color:var(--accent)}
+.wadd{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;border:0;background:var(--accent-soft);color:var(--accent)}.wadd svg{width:16px;height:16px;stroke:currentColor}
+.wl{display:flex;gap:8px;align-items:flex-start;text-align:left;border:0;background:none;padding:5px 2px;font:inherit;font-size:14px;color:inherit;width:100%}
+.wl.ev{border-left:3px solid var(--c);padding-left:8px;border-radius:3px}.wl .wt{flex:none;min-width:38px;font-size:12.5px;font-weight:700;color:var(--muted)}.wl.ev .wt{color:var(--c)}
+.wl.tk .wt i{display:block;width:13px;height:13px;border:2px solid var(--muted);border-radius:50%;margin:2px 0 0 4px}.wl .wx{flex:1;min-width:0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wempty{font-size:13px;color:var(--muted);padding:4px 2px}
 .bday{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 10px;border-radius:14px;background:color-mix(in srgb,#F06595 13%,var(--surface));border:1px solid color-mix(in srgb,#F06595 40%,var(--line))}.bday .cake{font-size:26px;line-height:1}.bday .body{display:flex;flex-direction:column}.bday span:not(.cake){font-size:13px;color:var(--muted)}
 .rem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,#E5A100 14%,var(--surface));border:1px solid color-mix(in srgb,#E5A100 40%,var(--line));margin-bottom:8px}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
@@ -396,7 +406,7 @@ function vToday(){
   const beforeLeft=sorted.filter(n=>n.before).length;
   S.pupils.filter(p=>p.birth&&p.birth.slice(-5)===tDay.slice(5)).forEach(p=>{h+=`<div class="bday"><span class="cake">🎂</span><div class="body"><b>Anniversaire de ${esc(p.name)}</b>${p.birth.length===10?'<span>'+agoYears(p.birth,tDay)+' ans</span>':''}</div></div>`});
   if(isT){const R=reminders();if(R.length)h+=`<h2>Rappels <span class="n">${R.length}</span></h2>`+R.map(r=>`<div class="rem"><div class="body"><b>${esc(r.title)}</b><span>${r.when}</span></div><button class="btn ghost" data-act="seen" data-v="${r.kind}" data-id="${r.id}">Vu</button></div>`).join('')}
-  if(isT&&(now.getDay()===5&&now.getHours()>=12||now.getDay()===6||now.getDay()===0))h+=`<button class="banner" data-act="bilan">Faire le bilan de la semaine</button>`;
+  if(isT&&(now.getDay()===5||now.getDay()===6||now.getDay()===0))h+=`<button class="banner" data-act="bilan">Faire le bilan de la semaine</button>`;
   if(M.notes&&inbox.length&&isT)h+=`<button class="banner" data-act="view" data-v="todo"><span class="n">${inbox.length}</span> note${inbox.length>1?'s':''} à trier</button>`;
   if(M.agenda){
     const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -411,7 +421,7 @@ function vToday(){
     const arr=[...S.events.filter(e=>e.date>today&&e.date<=end).map(e=>({d:e.date,t:e.time||'97',h:eventCard(e)})),...sorted.filter(n=>n.due>today&&n.due<=end).map(n=>({d:n.due,t:'98',h:itemRow(n)}))].sort((a,b)=>a.d.localeCompare(b.d)||a.t.localeCompare(b.t));
     if(arr.length)h+=`<h2>Cette semaine <span class="n">${arr.length}</span></h2>`+arr.map(x=>x.h).join('');
   }
-  if(isT&&!(now.getDay()===5&&now.getHours()>=12||now.getDay()===6||now.getDay()===0))h+=`<p style="text-align:center;margin:18px 0 4px"><button class="link" data-act="bilan">Bilan de la semaine</button></p>`;
+  if(isT&&!(now.getDay()===5||now.getDay()===6||now.getDay()===0))h+=`<p style="text-align:center;margin:18px 0 4px"><button class="link" data-act="bilan">Bilan de la semaine</button></p>`;
   if(S.demo)h+=`<div class="demo">Ces notes sont des <b>données de démonstration</b> inspirées d’une vraie journée de classe. <button data-act="clearDemo">Les effacer</button></div>`;
   return h;
 }
@@ -440,9 +450,21 @@ function vAgenda(){
   const hasEv=d=>S.events.some(e=>e.date===d)||S.notes.some(n=>n.due===d&&!n.done&&!n.inbox);
   let h=`<div class="top"><h1>Agenda</h1>${gear()}</div><div class="seg" style="margin-top:6px"><button class="${agMode==='week'?'on':''}" data-act="ag" data-v="week">Semaine</button><button class="${agMode==='month'?'on':''}" data-act="ag" data-v="month">Mois</button></div>`;
   if(agMode==='week'){
-    const mon=addDays(sel,-((sel.getDay()+6)%7));
-    h+=`<div class="top" style="margin:10px 0 8px;align-items:center"><button class="iconbtn" data-act="shift" data-v="-7" aria-label="Semaine précédente">${ICONS.back}</button><b>${mon.getDate()} ${MOIS[mon.getMonth()]}</b><button class="iconbtn" data-act="shift" data-v="7" aria-label="Semaine suivante">${ICONS.chev}</button></div>
-    <div class="week">${Array.from({length:7},(_,i)=>{const d=addDays(mon,i),k=ymd(d);return `<button class="${k===agSel?'sel':''} ${k===today?'today':''}" data-act="day" data-v="${k}"><small>${J3[i]}</small><b>${d.getDate()}</b></button>`}).join('')}</div>`;
+    const mon=addDays(sel,-((sel.getDay()+6)%7)),sun=addDays(mon,6),JL=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+    const lab=d=>d.getDate()+' '+MOIS[d.getMonth()].slice(0,4)+(MOIS[d.getMonth()].length>4?'.':'');
+    h+=`<div class="top" style="margin:10px 0 10px;align-items:center"><button class="iconbtn" data-act="shift" data-v="-7" aria-label="Semaine précédente">${ICONS.back}</button><b>${lab(mon)} – ${lab(sun)}</b><button class="iconbtn" data-act="shift" data-v="7" aria-label="Semaine suivante">${ICONS.chev}</button></div><div class="wgrid">`;
+    for(let i=0;i<7;i++){
+      const d=addDays(mon,i),k=ymd(d);
+      const ev=S.events.filter(e=>e.date===k).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+      const tk=S.notes.filter(n=>n.due===k&&!n.done&&!n.inbox);
+      const bd=S.pupils.filter(x=>x.birth&&x.birth.slice(-5)===k.slice(5));
+      const lines=bd.map(x=>`<div class="wl"><span class="wt">🎂</span><span class="wx">Anniversaire de ${esc(x.name)}</span></div>`).join('')
+        +ev.map(e=>{const c=(EV[e.kind]||EV.autre)[1],pu=pupil(e.pupilId);return `<button class="wl ev" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><span class="wt">${e.time||'Jour'}</span><span class="wx">${esc(e.title)}${pu?' · '+esc(pu.name):''}</span></button>`}).join('')
+        +tk.map(n=>`<button class="wl tk" data-act="openNote" data-id="${n.id}"><span class="wt"><i></i></span><span class="wx">${esc(n.text)}</span></button>`).join('');
+      h+=`<div class="wday ${k===today?'today':''} ${i>4?'we':''}"><div class="wh"><b>${JL[i]} ${d.getDate()}</b><button class="wadd" data-act="dayAdd" data-v="${k}" aria-label="Ajouter ce jour-là">${ICONS.plus}</button></div>${lines||'<div class="wempty">Rien de prévu</div>'}</div>`;
+    }
+    h+='</div>';
+    return h;
   }else{
     const m=new Date(agMonth.getFullYear(),agMonth.getMonth(),1),start=addDays(m,-((m.getDay()+6)%7));
     h+=`<div class="top" style="margin:10px 0 8px;align-items:center"><button class="iconbtn" data-act="mshift" data-v="-1" aria-label="Mois précédent">${ICONS.back}</button><b>${cap(MOIS[m.getMonth()])} ${m.getFullYear()}</b><button class="iconbtn" data-act="mshift" data-v="1" aria-label="Mois suivant">${ICONS.chev}</button></div>
@@ -759,6 +781,7 @@ const ACT={
   doneNote:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;persist()}sheet=null;render()},
   addEventDay:()=>openSheet({type:'event',d:{title:'',date:tDay,time:'',kind:'rdv'}}),
   addTask:()=>{const d=newDraft();applyDate(d,tDay);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
+  dayAdd:v=>{const d=newDraft();applyDate(d,v);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
   addEvent:()=>{const d=newDraft();applyDate(d,agSel);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
   openEvent:(v,id)=>{const e=S.events.find(x=>x.id===id);if(e)openSheet({type:'event',d:{...e}})},
   erepeat:()=>{const e=sheet.d;e.title=$('#et').value;e.date=$('#ed').value;e.time=$('#eh').value;e.repeat=!e.repeat;renderSheet()},

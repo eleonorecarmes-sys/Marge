@@ -161,6 +161,13 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .wl.ev{border-left:3px solid var(--c);padding-left:8px;border-radius:3px}.wl .wt{flex:none;min-width:38px;font-size:12.5px;font-weight:700;color:var(--muted)}.wl.ev .wt{color:var(--c)}
 .wl.tk .wt i{display:block;width:13px;height:13px;border:2px solid var(--muted);border-radius:50%;margin:2px 0 0 4px}.wl .wx{flex:1;min-width:0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wempty{font-size:13px;color:var(--muted);padding:4px 2px}
+.swipe[data-drag],.wl[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.dragging{opacity:.3}.dghost{position:fixed;z-index:200;pointer-events:none;opacity:.95;box-shadow:0 10px 30px rgba(0,0,0,.28);border-radius:14px;background:var(--surface);transform:scale(1.03)}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:150;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.12)}
+.dock div{flex:1 1 90px;max-width:140px;text-align:center;padding:14px 6px;border-radius:12px;background:var(--soft);font-weight:700;font-size:14px}
+.dock div.over,.wday.over,.cal button.over{background:var(--accent-soft);outline:2px solid var(--accent)}
+.psheet h3{font-size:28px;margin-bottom:6px}.psheet h2{font-size:19px}.psheet .txt{font-size:17px}.psheet .evb b{font-size:17px}.psheet label{font-size:14px!important}
+.psheet .chip{font-size:16px;padding:11px 18px}.psheet textarea,.psheet input{font-size:17px}.psheet .empty{font-size:15px}.psheet .btn{font-size:17px;min-height:50px}.psheet .pill{font-size:13px}
 .bday{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 10px;border-radius:14px;background:color-mix(in srgb,#F06595 13%,var(--surface));border:1px solid color-mix(in srgb,#F06595 40%,var(--line))}.bday .cake{font-size:26px;line-height:1}.bday .body{display:flex;flex-direction:column}.bday span:not(.cake){font-size:13px;color:var(--muted)}
 .rem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,#E5A100 14%,var(--surface));border:1px solid color-mix(in srgb,#E5A100 40%,var(--line));margin-bottom:8px}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
@@ -372,7 +379,7 @@ function dueLabel(n){
 }
 function itemRow(n,q=''){
   const s=subj(n.subject),p=pupil(n.pupilId),c=colorOf(n);
-  return `<div class="swipe"><button class="swdel" data-act="delQuick" data-id="${n.id}">Supprimer</button><div class="item ${n.done?'done':''} ${n.inbox&&!n.done?'inbox':''}" style="--c:${c}">
+  return `<div class="swipe" data-drag="n:${n.id}"><button class="swdel" data-act="delQuick" data-id="${n.id}">Supprimer</button><div class="item ${n.done?'done':''} ${n.inbox&&!n.done?'inbox':''}" style="--c:${c}">
     <button class="chk ${n.done?'on':''}" data-act="toggle" data-id="${n.id}" aria-label="Fait">${ICONS.check}</button>
     <button class="body" data-act="openNote" data-id="${n.id}">
       <div class="txt">${hl(n.text,q)}</div>
@@ -381,7 +388,7 @@ function itemRow(n,q=''){
 }
 function eventCard(e,q=''){
   const [lab,c]=EV[e.kind]||EV.autre;
-  return `<div class="swipe"><button class="swdel" data-act="delQuickE" data-id="${e.id}">Supprimer</button><button class="evc" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><div class="evt ${e.time?'':'day'}">${e.time||'Jour'}</div><div class="evb"><b>${hl(e.title,q)}</b><span>${lab}${pupil(e.pupilId)?' · '+esc(pupil(e.pupilId).name):''}${e.date!==ymd(new Date())?' · '+frDate(fromYmd(e.date)):''}</span></div></button></div>`;
+  return `<div class="swipe" data-drag="e:${e.id}"><button class="swdel" data-act="delQuickE" data-id="${e.id}">Supprimer</button><button class="evc" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><div class="evt ${e.time?'':'day'}">${e.time||'Jour'}</div><div class="evb"><b>${hl(e.title,q)}</b><span>${lab}${pupil(e.pupilId)?' · '+esc(pupil(e.pupilId).name):''}${e.date!==ymd(new Date())?' · '+frDate(fromYmd(e.date)):''}</span></div></button></div>`;
 }
 
 function vToday(){
@@ -458,16 +465,16 @@ function vAgenda(){
       const tk=S.notes.filter(n=>n.due===k&&!n.done&&!n.inbox);
       const bd=S.pupils.filter(x=>x.birth&&x.birth.slice(-5)===k.slice(5));
       const lines=bd.map(x=>`<div class="wl"><span class="wt">🎂</span><span class="wx">Anniversaire de ${esc(x.name)}</span></div>`).join('')
-        +ev.map(e=>{const c=(EV[e.kind]||EV.autre)[1],pu=pupil(e.pupilId);return `<button class="wl ev" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><span class="wt">${e.time||'Jour'}</span><span class="wx">${esc(e.title)}${pu?' · '+esc(pu.name):''}</span></button>`}).join('')
-        +tk.map(n=>`<button class="wl tk" data-act="openNote" data-id="${n.id}"><span class="wt"><i></i></span><span class="wx">${esc(n.text)}</span></button>`).join('');
-      h+=`<div class="wday ${k===today?'today':''} ${i>4?'we':''}"><div class="wh"><b>${JL[i]} ${d.getDate()}</b><button class="wadd" data-act="dayAdd" data-v="${k}" aria-label="Ajouter ce jour-là">${ICONS.plus}</button></div>${lines||'<div class="wempty">Rien de prévu</div>'}</div>`;
+        +ev.map(e=>{const c=(EV[e.kind]||EV.autre)[1],pu=pupil(e.pupilId);return `<button class="wl ev" data-drag="e:${e.id}" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><span class="wt">${e.time||'Jour'}</span><span class="wx">${esc(e.title)}${pu?' · '+esc(pu.name):''}</span></button>`}).join('')
+        +tk.map(n=>`<button class="wl tk" data-drag="n:${n.id}" data-act="openNote" data-id="${n.id}"><span class="wt"><i></i></span><span class="wx">${esc(n.text)}</span></button>`).join('');
+      h+=`<div class="wday ${k===today?'today':''} ${i>4?'we':''}" data-drop="${k}"><div class="wh"><b>${JL[i]} ${d.getDate()}</b><button class="wadd" data-act="dayAdd" data-v="${k}" aria-label="Ajouter ce jour-là">${ICONS.plus}</button></div>${lines||'<div class="wempty">Rien de prévu</div>'}</div>`;
     }
     h+='</div>';
     return h;
   }else{
     const m=new Date(agMonth.getFullYear(),agMonth.getMonth(),1),start=addDays(m,-((m.getDay()+6)%7));
     h+=`<div class="top" style="margin:10px 0 8px;align-items:center"><button class="iconbtn" data-act="mshift" data-v="-1" aria-label="Mois précédent">${ICONS.back}</button><b>${cap(MOIS[m.getMonth()])} ${m.getFullYear()}</b><button class="iconbtn" data-act="mshift" data-v="1" aria-label="Mois suivant">${ICONS.chev}</button></div>
-    <div class="cal">${J3.map(j=>`<div class="dow">${j}</div>`).join('')}${Array.from({length:42},(_,i)=>{const d=addDays(start,i),k=ymd(d);return `<button class="${d.getMonth()!==m.getMonth()?'out':''} ${k===today?'today':''} ${k===agSel?'sel':''}" data-act="day" data-v="${k}">${d.getDate()}${hasEv(k)?'<i></i>':''}</button>`}).join('')}</div>`;
+    <div class="cal">${J3.map(j=>`<div class="dow">${j}</div>`).join('')}${Array.from({length:42},(_,i)=>{const d=addDays(start,i),k=ymd(d);return `<button class="${d.getMonth()!==m.getMonth()?'out':''} ${k===today?'today':''} ${k===agSel?'sel':''}" data-drop="${k}" data-act="day" data-v="${k}">${d.getDate()}${hasEv(k)?'<i></i>':''}</button>`}).join('')}</div>`;
   }
   const ev=S.events.filter(e=>e.date===agSel).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
   h+=`<h2>${cap(frDate(sel))}</h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement ce jour-là.</div>');
@@ -492,7 +499,7 @@ function vClass(){
   const pn=M.pupilNotes;
   let h=seg+`<div class="top"><div><h1>${esc(S.className||'Ma classe')}</h1><p class="sub">${S.pupils.length} élève${S.pupils.length>1?'s':''} · prénoms ou initiales seulement</p></div>${gear()}</div>`;
   h+=card(S.pupils.length?S.pupils.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(p=>{const open=S.notes.filter(n=>n.pupilId===p.id&&!n.done).length;return `<div class="setrow"><button class="main" data-act="pupil" data-id="${p.id}" style="display:block"><b>${esc(p.name)}</b>${pn?`<small>${p.notes.length?esc(p.notes[p.notes.length-1].text):'Aucune note'}</small>`:''}</button>${open?`<span class="n">${open} à faire</span>`:''}<span style="color:var(--muted);width:20px;flex:none">${ICONS.chev}</span></div>`}).join(''):'<div class="empty">Ajoute les premiers élèves de ta classe.</div>');
-  h+=`<div class="field"><label for="np">Ajouter un élève</label><div style="display:flex;gap:8px"><input id="np" placeholder="Prénom ou initiale" autocomplete="off"><button class="btn" data-act="addPupil" style="flex:none">Ajouter</button></div><label for="nb" style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px">Anniversaire (facultatif)</label><input id="nb" type="date"><p class="hint">Aucune donnée ne quitte cet appareil.</p></div>`;
+  h+=`<div class="field"><label for="np">Ajouter un élève</label><div style="display:flex;gap:8px"><input id="np" placeholder="Prénom ou initiale" autocomplete="off"><button class="btn" data-act="addPupil" style="flex:none">Ajouter</button></div><label for="nb" style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px">Anniversaire (facultatif)</label><input id="nb" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa"><p class="hint">Aucune donnée ne quitte cet appareil.</p></div>`;
   return h;
 }
 
@@ -647,7 +654,7 @@ function renderSheet(){
     const lab={note:['Note','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
     const lb='display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
     const age=p.birth&&p.birth.length===10?`<span style="color:var(--muted);font-size:14px">${agoYears(p.birth)} ans</span>`:'';
-    body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Né(e) le</label><input id="pb" type="date" data-pid="${p.id}" value="${p.birth&&p.birth.length===10?p.birth:''}" style="flex:1">${age}</div>
+    body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Né(e) le</label><input id="pb" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa" data-pid="${p.id}" value="${fmtBirth(p.birth)}" style="flex:1">${age}</div>
     ${sec('À faire',todo.length,'#E8590C')}${todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Rien à faire pour cet élève.</div>'}
     ${sec('Événements',evs.length,'#1C7ED6')}${evs.length?evs.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement à venir.</div>'}
     ${pn?sec('Notes',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore de note.</div>'):''}
@@ -658,6 +665,7 @@ function renderSheet(){
     <button class="btn block" data-act="savePupilNote" data-id="${p.id}">Enregistrer</button>
     ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneT.map(n=>itemRow(n)).join(''):''}`:''}
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button><button class="btn ghost block" data-act="close">Fermer</button></div>`;
+    body='<div class="psheet">'+body+'</div>';
   }else if(sheet.type==='res'){
     const r=sheet.d;
     body=`<div class="grab"></div><h3>${r.id?'Modifier la ressource':'Nouvelle ressource'}</h3>
@@ -683,6 +691,8 @@ function readNote(){
   const h=$('#nh');if(h)sheet.d.time=h.value;
 }
 function readPupil(){if(!sheet||sheet.type!=='pupil')return;const t=$('#pn');if(t)sheet.f.text=t.value;const d=$('#pd');if(d){sheet.f.date=d.value;if(d.value&&sheet.f.type==='todo')sheet.f.when=''}const tm=$('#pt');if(tm)sheet.f.time=tm.value}
+function fmtBirth(b){return b&&b.length===10?b.slice(8)+'/'+b.slice(5,7)+'/'+b.slice(0,4):''}
+function parseBirth(t){const d=String(t||'').replace(/\D/g,'');if(d.length!==8)return null;const D=+d.slice(0,2),M=+d.slice(2,4),Y=+d.slice(4);if(M<1||M>12||D<1||Y<1990||Y>new Date().getFullYear()+1)return null;const dt=new Date(Y,M-1,D);if(dt.getMonth()!==M-1)return null;return ymd(dt)}
 function agoYears(b,at){const y=+b.slice(0,4),d=at?fromYmd(at):new Date(),a=d.getFullYear()-y;return a}
 function resizeImage(file){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const m=900,s=Math.min(1,m/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.7))};im.src=r.result};r.readAsDataURL(file)})}
 function weeklyCopies(ev,n){for(let i=1;i<=n;i++)S.events.push({...ev,id:uid(),date:ymd(addDays(fromYmd(ev.date),7*i))})}
@@ -795,7 +805,7 @@ const ACT={
   delEvent:()=>{S.events=S.events.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()},
   pupil:(v,id)=>openSheet({type:'pupil',id,f:{type:'note',text:'',when:'',date:'',time:''}}),
   pwhen:v=>{readPupil();sheet.f.when=v;sheet.f.date='';renderSheet()},
-  addPupil:()=>{const i=$('#np'),v=i.value.trim(),b=$('#nb');if(v){S.pupils.push({id:uid(),name:v,notes:[],birth:b&&b.value?b.value:''});persist();render()}},
+  addPupil:()=>{const i=$('#np'),v=i.value.trim(),b=$('#nb');if(v){S.pupils.push({id:uid(),name:v,notes:[],birth:(b&&parseBirth(b.value))||''});persist();render()}},
   savePupilNote:(v,id)=>{
     readPupil();const p=pupil(id),f=sheet.f,t=f.text.trim(),ty=f.type||'note';
     if(!p||!t){toast('Écris quelques mots d’abord');return}
@@ -833,11 +843,54 @@ function doCopy(id,share){
 }
 const MUT=new Set(['saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
+(function(){
+  let dg=null,timer=null,ghost=null,dock=null,raf=0,lastY=0,lastOver=null;
+  const iso=d=>ymd(d);
+  const chips=ev=>{const t=new Date(),T=iso(t),nm=iso(addDays(t,7-((t.getDay()+6)%7)));
+    const a=[['Aujourd’hui',T],['Demain',iso(addDays(t,1))],['Cette semaine',dueFor('week')],['Sem. prochaine',nm]];if(!ev)a.push(['Sans date','']);return a};
+  const dropOf=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest('[data-drop]')};
+  function cleanup(){clearTimeout(timer);timer=null;cancelAnimationFrame(raf);window._dragging=false;if(ghost){ghost.remove();ghost=null}if(dock){dock.remove();dock=null}
+    document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'));document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));dg=null;lastOver=null}
+  function begin(){
+    if(!dg)return;const src=dg.src,r=src.getBoundingClientRect();window._dragging=true;dg.active=true;
+    ghost=src.cloneNode(true);ghost.classList.add('dghost');ghost.classList.remove('dragging');ghost.style.width=r.width+'px';ghost.style.left=r.left+'px';ghost.style.top=r.top+'px';ghost.dataset.drag='';document.body.appendChild(ghost);
+    src.classList.add('dragging');dg.ox=dg.x-r.left;dg.oy=dg.y-r.top;
+    dock=document.createElement('div');dock.className='dock';dock.innerHTML=chips(dg.kind==='e').map(([l,d])=>`<div data-drop="${d}">${l}</div>`).join('');document.body.appendChild(dock);
+    try{navigator.vibrate&&navigator.vibrate(15)}catch(e){}
+    const loop=()=>{if(!dg||!dg.active)return;const h=innerHeight;if(lastY<90)scrollBy(0,-14);else if(lastY>h-170&&lastY<h-90)scrollBy(0,14);raf=requestAnimationFrame(loop)};raf=requestAnimationFrame(loop);
+  }
+  document.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.chk,.swdel,input,textarea,a,select'))return;
+    const src=e.target.closest('[data-drag]');if(!src||!src.dataset.drag)return;
+    const [k,id]=src.dataset.drag.split(':');if(e.pointerType==='mouse'&&e.button!==0)return;
+    dg={src,kind:k,id,x:e.clientX,y:e.clientY,active:false};timer=setTimeout(begin,380);
+  });
+  document.addEventListener('pointermove',e=>{
+    if(!dg)return;
+    if(!dg.active){if(Math.hypot(e.clientX-dg.x,e.clientY-dg.y)>9){clearTimeout(timer);dg=null}return}
+    lastY=e.clientY;ghost.style.left=(e.clientX-dg.ox)+'px';ghost.style.top=(e.clientY-dg.oy)+'px';
+    const t=dropOf(e.clientX,e.clientY);if(t!==lastOver){document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));if(t)t.classList.add('over');lastOver=t}
+  });
+  document.addEventListener('touchmove',e=>{if(window._dragging)e.preventDefault()},{passive:false});
+  const finish=e=>{
+    if(!dg){return}
+    if(!dg.active){clearTimeout(timer);dg=null;return}
+    const t=dropOf(e.clientX,e.clientY),kind=dg.kind,id=dg.id;
+    cleanup();swJust=true;setTimeout(()=>{swJust=false},120);
+    if(!t)return;const date=t.getAttribute('data-drop');
+    if(kind==='e'){if(!date){toast('Un événement a besoin d’une date');return}
+      const ev=S.events.find(x=>x.id===id);if(!ev||ev.date===date)return;hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[];ev.date=date;}
+    else{const n=S.notes.find(x=>x.id===id);if(!n||(n.due||'')===date)return;hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[];n.due=date;if(date)n.inbox=false}
+    persist();render();if(sheet)renderSheet();toast(date?'Déplacé : '+frDate(fromYmd(date)):'Déplacé : sans date');
+  };
+  document.addEventListener('pointerup',finish);
+  document.addEventListener('pointercancel',e=>{if(dg&&dg.active)finish(e);else{clearTimeout(timer);dg=null}});
+})();
 function closeSw(){if(swOpen){swOpen.classList.remove('open');const i=swOpen.lastElementChild;if(i)i.style.transform='';swOpen=null}}
 (function(){
   let st=null;
   document.addEventListener('pointerdown',e=>{const row=e.target.closest('.swipe');if(swOpen&&swOpen!==row&&!e.target.closest('.swdel'))closeSw();if(!row||e.target.closest('.swdel')){st=null;return}st={row,x:e.clientX,y:e.clientY,drag:false,base:row.classList.contains('open')?-92:0,v:0}});
-  document.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
+  document.addEventListener('pointermove',e=>{if(window._dragging){st=null;return}if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
     if(!st.drag){if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.5){st.drag=true;st.row.classList.add('moving')}else if(Math.abs(dy)>10){st=null;return}}
     if(st&&st.drag){st.v=Math.max(-92,Math.min(0,st.base+dx));st.row.lastElementChild.style.transform='translateX('+st.v+'px)'}});
   const end=()=>{if(!st)return;if(st.drag){const o=st.v<-46;st.row.classList.remove('moving');st.row.classList.toggle('open',o);st.row.lastElementChild.style.transform=o?'translateX(-92px)':'';swOpen=o?st.row:null;swJust=true;setTimeout(()=>{swJust=false},60)}st=null};
@@ -859,6 +912,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&sheet)closeSheet(
 function keepFocus(id,val,setter){const t=$('#'+id);const pos=t.selectionStart;setter(val);render();const i=$('#'+id);i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}
 document.addEventListener('input',ev=>{
   const t=ev.target;
+  if(t.classList&&t.classList.contains('bin')){let d=t.value.replace(/\D/g,'').slice(0,8);t.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d}
   if(t.id==='q')keepFocus('q',t.value,v=>qToday=v);
   else if(t.id==='qt')keepFocus('qt',t.value,v=>qTodo=v);
   else if(t.id==='qr')keepFocus('qr',t.value,v=>qRes=v);
@@ -869,7 +923,7 @@ document.addEventListener('input',ev=>{
   else if(t.dataset&&t.dataset.sname){const s=subj(t.dataset.sname);if(s){s.name=t.value;persist()}}
 });
 document.addEventListener('change',ev=>{
-  const b=ev.target;if(b&&b.id==='pb'){const p=pupil(b.dataset.pid);if(p){hist.push(JSON.stringify(S));redo=[];p.birth=b.value||'';persist();renderSheet();render()}}
+  const b=ev.target;if(b&&b.id==='pb'){const p=pupil(b.dataset.pid);if(p){const v=b.value.trim()?parseBirth(b.value):'';if(v===null){toast('Date non reconnue, écris par exemple 09/10/2015');return}hist.push(JSON.stringify(S));redo=[];p.birth=v;persist();renderSheet();render()}}
 });
 document.addEventListener('change',async ev=>{
   if(ev.target.id==='ph'&&ev.target.files[0]){

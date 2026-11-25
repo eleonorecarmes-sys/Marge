@@ -156,8 +156,6 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
 .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.gal button{aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--soft)}.gal img{width:100%;height:100%;object-fit:cover;display:block}
 .addrow{display:grid;place-items:center;width:42px;height:42px;margin:2px 0 6px auto;border-radius:50%;background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line))}
-.qwrap{position:relative;margin:2px 0 8px}.qwrap .qadd{margin:0;padding-right:84px}.qok{display:none;position:absolute;right:6px;top:6px;bottom:6px;padding:0 12px;border:0;border-radius:9px;background:var(--accent);color:#fff;font:inherit;font-size:14px;font-weight:600}.qwrap.has .qok{display:block}
-.qadd{display:block;width:100%;margin:2px 0 8px;padding:11px 14px;border:1px dashed var(--line,#cfd4dc);border-radius:12px;background:transparent;color:var(--ink,inherit);font:inherit;font-size:15px}.qadd:focus{outline:none;border-style:solid;border-color:var(--accent)}
 .addrow svg{width:22px;height:22px;stroke:currentColor}
 .swipe{position:relative;margin-bottom:8px;border-radius:14px;overflow:hidden}
 .swipe .item,.swipe .evc{margin-bottom:0;position:relative;transition:transform .18s ease;touch-action:pan-y}
@@ -644,7 +642,6 @@ const ACT={
   day:v=>{agSel=v;const x=fromYmd(v);agMonth=new Date(x.getFullYear(),x.getMonth(),1);render()},
   shift:v=>{agSel=ymd(addDays(fromYmd(agSel),+v));render()},
   mshift:v=>{agMonth=new Date(agMonth.getFullYear(),agMonth.getMonth()+ +v,1);render()},
-  qok:(v,id,el)=>qAdd(el&&el.parentNode&&el.parentNode.querySelector('.qadd')),
   bilan:()=>openSheet({type:'bilan'}),
   reportMon:()=>{const now=new Date(),nm=ymd(addDays(now,7-((now.getDay()+6)%7)));S.notes.forEach(n=>{if(!n.done&&!n.inbox&&n.due&&n.due<nm)n.due=nm});persist();toast('Retards reportés à lundi');closeSheet()},
   capture:()=>{openSheet({type:'note',d:newDraft()});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
@@ -786,12 +783,6 @@ document.addEventListener('input',ev=>{
   else if(t.id==='cn'){S.className=t.value;persist()}
   else if(t.dataset&&t.dataset.sname){const s=subj(t.dataset.sname);if(s){s.name=t.value;persist()}}
 });
-function qAdd(q){
-  if(!q||!q.value.trim())return;const t=q.value.trim();q.value='';hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[];
-  const d=newDraft();d.text=t;if(q.dataset.day&&!autoSort(t).date)applyDate(d,q.dataset.day);sheet={type:'note',d};ACT.saveNote();
-}
-document.addEventListener('input',ev=>{const q=ev.target.closest&&ev.target.closest('.qadd');if(q)q.parentNode.classList.toggle('has',!!q.value.trim())});
-document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.classList&&ev.target.classList.contains('qadd')){ev.preventDefault();qAdd(ev.target)}});
 document.addEventListener('change',async ev=>{
   if(ev.target.id==='ph'&&ev.target.files[0]){
     readNote();

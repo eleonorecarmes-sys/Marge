@@ -314,7 +314,7 @@ function ensure(){
   if(!S.templates)S.templates=TEMPLATES.map(t=>({id:uid(),title:t[0],text:t[1]}));
   if(!S.subjects)S.subjects=DEF_SUBJECTS.map(x=>({...x}));
   S.notes.forEach(n=>{if(n.subject===undefined)n.subject='';if(n.pupilId===undefined)n.pupilId='';if(n.inbox===undefined)n.inbox=false;n.before=false});
-  if(!S.recurring)S.recurring=[];if(typeof S.ideas!=='string')S.ideas='';if(!S.res)S.res=[];
+  if(!S.recurring)S.recurring=[];if(typeof S.ideas!=='string')S.ideas='';if(!S.ideaList){S.ideaList=S.ideas.split('\n').map(x=>x.replace(/^\s*[•\-]\s*/,'').trim()).filter(Boolean).map((t,i)=>({id:uid(),text:t,ts:Date.now()-i}))}if(!S.res)S.res=[];
   genRecurring();
 }
 function blank(){return {v:2,demo:false,notes:[],events:[],pupils:[],className:S.className||'Ma classe',settings:S.settings,templates:S.templates,subjects:S.subjects,recurring:S.recurring||[]}}
@@ -512,7 +512,10 @@ function vClass(){
 }
 
 function vIdeas(){
-  return `<div class="top"><div><h1>Idées</h1><p class="sub">Les idées et propositions de tes élèves.</p></div>${gear()}</div><div class="field"><textarea id="idt" style="min-height:340px" placeholder="Écris ou dicte une idée par ligne…">${esc(S.ideas)}</textarea></div>`;
+  const L=S.ideaList.slice().sort((a,b)=>b.ts-a.ts);
+  return `<div class="top"><div><h1>Idées</h1><p class="sub">Les idées et propositions de tes élèves.</p></div>${gear()}</div>
+  <div class="field"><textarea id="idn" style="min-height:64px" placeholder="Une idée… puis Entrée pour l’ajouter"></textarea><button class="btn block" style="margin-top:8px" data-act="addIdea">Ajouter</button></div>
+  ${L.length?L.map(x=>{const d=new Date(x.ts);return `<div class="swipe"><button class="swdel" data-act="delIdea" data-id="${x.id}">Supprimer</button><div class="item" style="--c:var(--accent)"><button class="body" data-act="editIdea" data-id="${x.id}"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]}</span></div></button></div></div>`}).join(''):'<div class="empty">Écris une idée et appuie sur Entrée : elle apparaît ici comme une petite carte.</div>'}`;
 }
 function vRes(){
   const q=norm(qRes.trim());
@@ -677,6 +680,8 @@ function renderSheet(){
     ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneT.map(n=>itemRow(n)).join(''):''}`:''}
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button><button class="btn ghost block" data-act="close">Fermer</button></div>`;
     body='<div class="psheet">'+body+'</div>';
+  }else if(sheet.type==='idea'){
+    body=`<div class="grab"></div><h3>Idée</h3><div class="field"><textarea id="iet" style="min-height:120px">${esc(sheet.d.text)}</textarea></div><div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delIdea">Supprimer</button><button class="btn block" data-act="saveIdea">Enregistrer</button></div>`;
   }else if(sheet.type==='res'){
     const r=sheet.d;
     body=`<div class="grab"></div><h3>${r.id?'Modifier la ressource':'Nouvelle ressource'}</h3>
@@ -725,6 +730,10 @@ const ACT={
   saveRes:()=>{const r=sheet.d;r.url=$('#ru').value.trim();r.desc=$('#rd').value.trim();if(!r.url){toast('Colle un lien d’abord');return}
     if(r.id){const i=S.res.findIndex(x=>x.id===r.id);S.res[i]={...r}}else S.res.push({...r,id:uid(),ts:Date.now()});persist();sheet=null;render();toast('Ressource gardée')},
   delRes:()=>{S.res=S.res.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()},
+  addIdea:()=>{const t=$('#idn'),v=t&&t.value.trim();if(!v){toast('Écris une idée d’abord');return}S.ideaList.push({id:uid(),text:v,ts:Date.now()});persist();render();const n=$('#idn');n&&n.focus()},
+  editIdea:(v,id)=>{const x=S.ideaList.find(q=>q.id===id);if(x){openSheet({type:'idea',d:{...x}});setTimeout(()=>{const c=$('#iet');c&&c.focus()},60)}},
+  saveIdea:()=>{const d=sheet.d,v=$('#iet').value.trim();if(!v){toast('Écris une idée d’abord');return}const x=S.ideaList.find(q=>q.id===d.id);if(x)x.text=v;persist();sheet=null;render()},
+  delIdea:(v,id)=>{S.ideaList=S.ideaList.filter(q=>q.id!==(id||(sheet&&sheet.d&&sheet.d.id)));persist();sheet=null;render();toast('Supprimée · touche ↩ pour annuler')},
   cmode:v=>{classMode=v;render()},
   settings:()=>setView('settings'),
   close:()=>closeSheet(),
@@ -859,7 +868,7 @@ function doCopy(id,share){
   if(share&&navigator.share){navigator.share({text:txt}).catch(()=>{});return}
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copié')).catch(()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copié')}catch(e){toast('Copie impossible')}ta.remove()});
 }
-const MUT=new Set(['saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
+const MUT=new Set(['addIdea','saveIdea','delIdea','saveRes','delRes','reportMon','setColor','toggle','saveNote','delNote','doneNote','saveEvent','delEvent','savePupilNote','addPupil','delPupil','saveTpl','delTpl','delPhoto','delRec','addRec','addSubject','delSubject','cycleColor','clearDemo','reset','delQuick','delQuickE','seen','mod','opt']);
 let swJust=false;
 function convertTo(kind,id,target){
   const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;
@@ -946,12 +955,7 @@ document.addEventListener('click',ev=>{
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!sheet){genRecurring();render()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&sheet)closeSheet()});
-document.addEventListener('focusin',ev=>{const t=ev.target;if(t&&t.id==='idt'&&!t.value.trim()){t.value='• ';S.ideas=t.value;persist();try{t.setSelectionRange(2,2)}catch(e){}}});
-document.addEventListener('keydown',ev=>{const t=ev.target;if(!t||t.id!=='idt'||ev.key!=='Enter')return;ev.preventDefault();
-  const v=t.value,a=t.selectionStart,b=t.selectionEnd,ls=v.lastIndexOf('\n',a-1)+1,line=v.slice(ls,a);let pos;
-  if(line.trim()==='•'){t.value=v.slice(0,ls)+v.slice(b);pos=ls}
-  else{const ins='\n• ';t.value=v.slice(0,a)+ins+v.slice(b);pos=a+ins.length}
-  try{t.setSelectionRange(pos,pos)}catch(e){}S.ideas=t.value;persist()});
+document.addEventListener('keydown',ev=>{const t=ev.target;if(t&&t.id==='idn'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();if(t.value.trim()){hist.push(JSON.stringify(S));if(hist.length>20)hist.shift();redo=[]}ACT.addIdea()}});
 function keepFocus(id,val,setter){const t=$('#'+id);const pos=t.selectionStart;setter(val);render();const i=$('#'+id);i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}
 document.addEventListener('input',ev=>{
   const t=ev.target;

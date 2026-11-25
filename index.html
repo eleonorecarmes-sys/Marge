@@ -131,6 +131,8 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .week button b{font:700 19px "Bricolage Grotesque",Figtree,sans-serif}
 .week button.sel{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.week button.sel small{color:var(--accent-ink);opacity:.85}
 .week button.today:not(.sel){border-color:var(--accent)}
+.week button i{width:5px;height:5px;border-radius:50%;background:var(--danger);position:absolute;bottom:4px;left:50%;margin-left:-2.5px}
+.week button.sel i{background:var(--accent-ink)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:600;z-index:50;max-width:90vw;text-align:center}
 .photo-full{width:100%;border-radius:14px;margin-top:10px;border:1px solid var(--line)}
 .demo{background:var(--soft);border-radius:14px;padding:12px 14px;font-size:14px;margin:16px 0 0}
@@ -260,9 +262,9 @@ function applyTheme(){
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#13141b':'#ffffff';
 }
 
-let classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
+let tDay=ymd(new Date()),classMode='eleves',view='today',qToday='',qTodo='',fSubj='',showDone=false,agMode='week',agSel=ymd(new Date()),agMonth=new Date(),sheet=null;
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600)}
-function setView(v){view=v;sheet=null;render();window.scrollTo(0,0)}
+function setView(v){if(v==='today'&&view==='today')tDay=ymd(new Date());view=v;sheet=null;render();window.scrollTo(0,0)}
 const subj=id=>S.subjects.find(x=>x.id===id);
 const pupil=id=>S.pupils.find(x=>x.id===id);
 const colorOf=n=>(subj(n.subject)||{color:NEUTRAL}).color;
@@ -277,7 +279,7 @@ function autoSort(text){
   else if(/collegue|atsem|aesh/.test(t))r.tag='collegue';
   else if(!r.tag&&/eleve|devoirs|cahier/.test(t))r.tag='eleve';
   for(const s of S.subjects){const k=KEYWORDS[s.id];if((k&&k.test(t))||(norm(s.name).length>3&&t.includes(norm(s.name)))){r.subject=s.id;break}}
-  if(/avant de partir|ce soir|avant la sortie/.test(t))r.when='before';else if(/demain/.test(t))r.when='tomorrow';else if(/aujourd/.test(t))r.when='today';else if(/cette semaine/.test(t))r.when='week';
+  if(/avant de partir|avant de rentrer|ce soir|avant la sortie/.test(t))r.when='before';else if(/demain/.test(t))r.when='tomorrow';else if(/aujourd/.test(t))r.when='today';else if(/cette semaine/.test(t))r.when='week';
   return r;
 }
 function dueFor(w){const t=new Date();return w==='before'||w==='today'?ymd(t):w==='tomorrow'?ymd(addDays(t,1)):w==='week'?ymd(addDays(t,((5-t.getDay()+7)%7)||1)):''}
@@ -304,7 +306,7 @@ const gear=()=>`<button class="iconbtn" data-act="settings" aria-label="Réglage
 function dueLabel(n){
   if(n.done||n.inbox)return '';
   const today=ymd(new Date());
-  if(n.before)return '<span class="pill warn">avant de partir</span>';
+  if(n.before)return '<span class="pill warn">avant de rentrer</span>';
   if(!n.due)return '';
   const d=fromYmd(n.due);
   if(n.due<today)return `<span class="pill warn">en retard · ${d.getDate()} ${MC[d.getMonth()]}</span>`;
@@ -327,7 +329,11 @@ function eventCard(e,q=''){
 
 function vToday(){
   const now=new Date(),today=ymd(now),q=qToday.trim(),M=S.settings.modules;
-  let h=`<div class="top"><div><h1>${cap(frDate(now))}</h1><p class="sub">Tout ce qui compte pour aujourd’hui.</p></div>${gear()}</div>
+  const isT=tDay===today,sel=fromYmd(tDay),mon=addDays(sel,-((sel.getDay()+6)%7));
+  const has=k=>S.events.some(e=>e.date===k)||S.notes.some(n=>n.due===k&&!n.done&&!n.inbox);
+  let h=`<div class="top"><div><h1>${cap(frDate(sel))}</h1><p class="sub">${isT?'Tout ce qui compte pour aujourd’hui.':'<button class="link" data-act="tday" data-v="'+today+'">Revenir à aujourd’hui</button>'}</p></div>${gear()}</div>
+    <div class="top" style="margin:4px 0 6px;align-items:center"><button class="iconbtn" data-act="tshift" data-v="-7" aria-label="Semaine précédente">${ICONS.back}</button><b style="font-size:14px;color:var(--muted)">Semaine du ${mon.getDate()} ${MOIS[mon.getMonth()]}</b><button class="iconbtn" data-act="tshift" data-v="7" aria-label="Semaine suivante">${ICONS.chev}</button></div>
+    <div class="week">${Array.from({length:7},(_,i)=>{const d=addDays(mon,i),k=ymd(d);return `<button class="${k===tDay?'sel':''} ${k===today?'today':''}" data-act="tday" data-v="${k}"><small>${J3[i]}</small><b>${d.getDate()}</b>${has(k)?'<i></i>':''}</button>`}).join('')}</div>
     <div class="search">${ICONS.search}<input id="q" type="search" placeholder="Retrouver une info…" value="${esc(qToday)}" autocomplete="off"></div>`;
   if(q){
     const r=searchAll(q),total=r.notes.length+r.events.length+r.pupils.length;
@@ -340,18 +346,18 @@ function vToday(){
   }
   const open=S.notes.filter(n=>!n.done),inbox=open.filter(n=>n.inbox),sorted=open.filter(n=>!n.inbox);
   const beforeLeft=sorted.filter(n=>n.before).length;
-  if(M.avant)h+=`<button class="cta" data-act="avant">${ICONS.moon}<div><b>Avant de partir</b><span>${beforeLeft?beforeLeft+' chose'+(beforeLeft>1?'s':'')+' à ne pas oublier':'Rien d’urgent à ne pas oublier'}</span></div></button>`;
-  if(M.notes&&inbox.length)h+=`<button class="banner" data-act="view" data-v="todo"><span class="n">${inbox.length}</span> note${inbox.length>1?'s':''} à trier</button>`;
+  if(M.avant&&isT)h+=`<button class="cta" data-act="avant">${ICONS.moon}<div><b>Avant de rentrer</b><span>${beforeLeft?beforeLeft+' chose'+(beforeLeft>1?'s':'')+' à ne pas oublier':'Rien d’urgent à ne pas oublier'}</span></div></button>`;
+  if(M.notes&&inbox.length&&isT)h+=`<button class="banner" data-act="view" data-v="todo"><span class="n">${inbox.length}</span> note${inbox.length>1?'s':''} à trier</button>`;
   if(M.agenda){
-    const ev=S.events.filter(e=>e.date===today).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
-    h+=`<h2>Événements <span class="n">${ev.length}</span></h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement aujourd’hui.</div>');
+    const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+    h+=`<h2>Événements <span class="n">${ev.length}</span></h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement '+(isT?'aujourd’hui':'ce jour-là')+'.</div>');
     const late=S.events.filter(e=>e.kind==='echeance'&&e.date>today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
-    if(late.length)h+='<h2>Dates limites à venir</h2>'+late.map(e=>eventCard(e)).join('');
+    if(late.length&&isT)h+='<h2>Dates limites à venir</h2>'+late.map(e=>eventCard(e)).join('');
   }
-  const todo=sorted.filter(n=>n.due&&n.due<=today).sort((a,b)=>(b.before-a.before)||a.due.localeCompare(b.due)||b.ts-a.ts);
-  h+=`<h2>À faire <span class="n">${todo.length}</span></h2>`+(todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Tout est fait pour aujourd’hui.</div>');
+  const todo=sorted.filter(n=>isT?(n.due&&n.due<=today):n.due===tDay).sort((a,b)=>(b.before-a.before)||a.due.localeCompare(b.due)||b.ts-a.ts);
+  h+=`<h2>À faire <span class="n">${todo.length}</span></h2>`+(todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">'+(isT?'Tout est fait pour aujourd’hui.':'Rien de prévu ce jour-là.')+'</div>');
   const soon=sorted.filter(n=>n.due>today).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,4);
-  if(soon.length)h+='<h2>À venir</h2>'+soon.map(n=>itemRow(n)).join('');
+  if(soon.length&&isT)h+='<h2>À venir</h2>'+soon.map(n=>itemRow(n)).join('');
   if(S.demo)h+=`<div class="demo">Ces notes sont des <b>données de démonstration</b> inspirées d’une vraie journée de classe. <button data-act="clearDemo">Les effacer</button></div>`;
   return h;
 }
@@ -432,14 +438,14 @@ function vSettings(){
     mod('class','Classe','La liste des élèves')+
     mod('pupilNotes','Notes de suivi par élève','Une petite fiche pour chaque élève')+
     mod('msgs','Messages aux parents','Des modèles à copier')+
-    mod('avant','Avant de partir','Le récap de fin de journée')+
+    mod('avant','Avant de rentrer','Le récap de fin de journée')+
     mod('photos','Photos dans les notes','Joindre une page de cahier ou un papier'))}
   <h2>Messages aux parents</h2>${card(`<div class="setrow"><div class="main"><b>Autoriser la modification des modèles</b><small>Modifier, ajouter ou supprimer tes modèles de messages</small></div>${sw(st.editTemplates,'data-act="opt" data-v="editTemplates" aria-label="Modifier les modèles"')}</div>`)}
   <h2>Ma classe</h2><input id="cn" value="${esc(S.className||'')}" placeholder="Nom de la classe" autocomplete="off">
   <h2>Idées pour plus tard</h2>${card(soon('Rappels de réunion qui sonnent','Des notifications, quand tu les choisis')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier')+soon('Lien avec la boîte mail','Être prévenue d’un nouveau message'))}
   <p class="hint" style="margin-top:8px">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>
-  <h2>Mes données</h2><p class="sub" style="margin:0 0 10px">Tout reste sur cet appareil. Rien n’est envoyé sur Internet.</p>
-  <div style="display:grid;gap:10px"><button class="btn ghost block" data-act="export">Enregistrer une copie</button><button class="btn danger block" data-act="reset">Tout effacer</button></div>`;
+  <h2>Mes données</h2><p class="sub" style="margin:0 0 10px">Tout reste sur cet appareil. Rien n’est envoyé sur Internet. Pour passer sur un autre appareil : enregistre une copie, envoie-la (AirDrop, Messages…), puis restaure-la là-bas.</p>
+  <div style="display:grid;gap:10px"><button class="btn ghost block" data-act="export">Enregistrer une copie</button><label class="btn ghost block" for="imp" style="cursor:pointer">Restaurer une copie</label><input id="imp" type="file" accept=".json,application/json" class="sr"><button class="btn danger block" data-act="reset">Tout effacer</button></div>`;
 }
 
 function render(){
@@ -458,7 +464,7 @@ function render(){
 
 function openSheet(s){sheet=s;renderSheet()}
 function closeSheet(){sheet=null;renderSheet();render()}
-const WHEN=[['before','Avant de partir'],['today','Aujourd’hui'],['tomorrow','Demain'],['week','Cette semaine']];
+const WHEN=[['before','Avant de rentrer'],['today','Aujourd’hui'],['tomorrow','Demain'],['week','Cette semaine']];
 function noteForm(d){
   const p=pupil(d.pupilId),s=subj(d.subject);
   const set={pupil:!!d.pupilId,subject:!!d.subject,when:!!(d.when||d.date),from:!!d.tag,photo:!!d.photo};
@@ -489,7 +495,7 @@ function renderSheet(){
   }else if(sheet.type==='avant'){
     const open=S.notes.filter(n=>!n.done&&!n.inbox&&(n.before||(n.due&&n.due<=ymd(new Date())))).sort((a,b)=>(b.before-a.before)||(b.ts-a.ts));
     const first=open.filter(n=>n.before);
-    body=`<div class="grab"></div><h3>Avant de partir</h3><p class="sub">${first.length?'Ces choses attendent encore :':'Tu peux partir l’esprit tranquille.'}</p>
+    body=`<div class="grab"></div><h3>Avant de rentrer</h3><p class="sub">${first.length?'Ces choses attendent encore :':'Tu peux partir l’esprit tranquille.'}</p>
     ${open.length?open.map(n=>itemRow(n)).join(''):'<div class="empty">Tout est fait pour aujourd’hui.</div>'}
     <h2>Demain</h2>${S.events.filter(e=>e.date===ymd(addDays(new Date(),1))).map(e=>eventCard(e)).join('')||'<div class="empty">Rien dans l’agenda demain.</div>'}
     <button class="btn block" style="margin-top:16px" data-act="close">Fermer</button>`;
@@ -535,6 +541,8 @@ const ACT={
   settings:()=>setView('settings'),
   close:()=>closeSheet(),
   toggle:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;persist();render()}},
+  tday:v=>{tDay=v;render();window.scrollTo(0,0)},
+  tshift:v=>{tDay=ymd(addDays(fromYmd(tDay),+v));render()},
   tfilter:v=>{fSubj=v;render()},
   toggleDone:()=>{showDone=!showDone;render()},
   ag:v=>{agMode=v;render()},
@@ -598,7 +606,7 @@ const ACT={
   addSubject:()=>{const used=S.subjects.map(s=>s.color);S.subjects.push({id:uid(),name:'Nouvelle matière',color:PALETTE.find(c=>!used.includes(c))||PALETTE[0]});persist();render()},
   delSubject:(v,id)=>{if(confirm('Supprimer cette matière ? Les notes restent, sans matière.')){S.subjects=S.subjects.filter(s=>s.id!==id);S.notes.forEach(n=>{if(n.subject===id)n.subject=''});persist();render()}},
   clearDemo:()=>{S=blank();persist();render();toast('Données de démonstration effacées')},
-  export:()=>{try{const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='marge-copie.json';a.click()}catch(e){toast('Copie impossible ici')}},
+  export:async()=>{const json=JSON.stringify(S,null,1);try{const f=new File([json],'marge-copie.json',{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return}}catch(e){if(e&&e.name==='AbortError')return}try{const b=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='marge-copie.json';a.click()}catch(e){toast('Copie impossible ici')}},
   reset:()=>{if(confirm('Tout effacer sur cet appareil ?')){S=blank();persist();sheet=null;render()}}
 };
 function doCopy(id,share){
@@ -630,6 +638,12 @@ document.addEventListener('change',async ev=>{
     try{sheet.d.photo=await resizeImage(ev.target.files[0]);renderSheet()}catch(e){toast('Photo illisible')}
   }
   if(ev.target.id==='nd'){readNote();renderSheet()}
+  if(ev.target.id==='imp'&&ev.target.files[0]){
+    try{const d=JSON.parse(await ev.target.files[0].text());if(!d||!Array.isArray(d.notes))throw 0;
+      if(confirm('Remplacer les données de cet appareil par cette copie ?')){S=d;ensure();applyTheme();persist();sheet=null;view='today';render();toast('Copie restaurée')}}
+    catch(e){toast('Fichier non reconnu')}
+    ev.target.value='';
+  }
 });
 
 ensure();applyTheme();

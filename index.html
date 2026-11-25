@@ -168,8 +168,7 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:150;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.12)}
 .dock div{flex:1 1 90px;max-width:140px;text-align:center;padding:14px 6px;border-radius:12px;background:var(--soft);font-weight:700;font-size:14px}
 .dock div.over,.wday.over,.cal button.over{background:var(--accent-soft);outline:2px solid var(--accent)}
-.psheet h3{font-size:28px;margin-bottom:6px}.psheet h2{font-size:19px}.psheet .txt{font-size:17px}.psheet .evb b{font-size:17px}.psheet label{font-size:14px!important}
-.psheet .chip{font-size:16px;padding:11px 18px}.psheet textarea,.psheet input{font-size:17px}.psheet .empty{font-size:15px}.psheet .btn{font-size:17px;min-height:50px}.psheet .pill{font-size:13px}
+.sheet.tall{min-height:94vh;min-height:94dvh;max-height:97vh;max-height:97dvh}
 .bday{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 10px;border-radius:14px;background:color-mix(in srgb,#F06595 13%,var(--surface));border:1px solid color-mix(in srgb,#F06595 40%,var(--line))}.bday .cake{font-size:26px;line-height:1}.bday .body{display:flex;flex-direction:column}.bday span:not(.cake){font-size:13px;color:var(--muted)}
 .rem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,#E5A100 14%,var(--surface));border:1px solid color-mix(in srgb,#E5A100 40%,var(--line));margin-bottom:8px}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
@@ -337,6 +336,10 @@ const pupil=id=>S.pupils.find(x=>x.id===id);
 const colorOf=n=>(subj(n.subject)||{color:NEUTRAL}).color;
 
 /* tri automatique par mots (sans IA) */
+const VERBS=['preparer','chercher','faire','appeler','envoyer','imprimer','copier','corriger','rendre','ecrire','demander','penser','organiser','reserver','commander','acheter','verifier','relancer','signer','ranger','contacter','planifier','prevenir','rediger','trier','finir','terminer','repondre','remplir','mettre','apporter','recuperer','deposer','rappeler','poster','publier','telecharger','creer','prendre','donner','distribuer','ramasser','noter','lire','relire','reprendre','revoir','valider','payer','rembourser','regler','inscrire','confirmer','annuler','decaler','reporter','chercher','trouver','installer','tester','mettre','sortir','emmener','amener','photocopier','scanner','afficher','completer','preparer','proposer','discuter','parler','voir','joindre','informer','former','evaluer','reviser'];
+const startsWithVerb=t=>{const w=norm(String(t||'').trim()).split(/[^a-z]+/)[0];return VERBS.includes(w)};
+const DEADLINE=/\b(pour|avant|d'ici|jusqu|au plus tard)\b/;
+const allowAutoDate=t=>!startsWithVerb(t)||DEADLINE.test(norm(t));
 function autoSort(text){
   const t=norm(text), r={tag:'',subject:'',pupilId:'',when:'',date:'',time:''};
   const p=S.pupils.find(p=>new RegExp('(^|[^a-z])'+norm(p.name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z]|$)').test(t));
@@ -546,7 +549,7 @@ function vSettings(){
     mod('agenda','Agenda','Semaine, mois, événements et dates limites')+
     mod('notes','À faire','Tes notes et tâches, triées par matière')+
     mod('class','Classe','La liste des élèves')+
-    mod('pupilNotes','Notes de suivi par élève','Une petite fiche pour chaque élève')+
+    mod('pupilNotes','Observations par élève','Ce que tu notes sur chaque élève, sans jamais le modifier')+
     mod('ideas','Idées','Une zone de texte pour les idées de tes élèves')+
     mod('res','Ressources','Garder les liens des sites utiles, par matière')+
     mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))+`<h2>Idées pour plus tard</h2>`+card(soon('Notifications qui sonnent','Des rappels même quand l’appli est fermée')+soon('Synchro entre appareils','Ordinateur, tablette et téléphone')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier'))+'<p class="hint">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>';
@@ -590,20 +593,23 @@ function noteForm(d){
   const p=pupil(d.pupilId),s=subj(d.subject),isNew=!d.id;
   const set={pupil:!!d.pupilId,subject:!!d.subject,when:!!(d.when||d.date||d.isEvent),photo:!!d.photo};
   const open=d.panel;
+  const kd=d.obs?'obs':d.isEvent?'event':d.evTouched&&d.todo?'todo':'';
+  const kinds=`<div class="lbl" style="margin:12px 0 6px">C’est…</div><div class="chips">${[['todo','À faire'],['event','Un événement'],...(S.settings.modules.pupilNotes?[['obs','Une observation']]:[])].map(([k,l])=>`<button class="chip ${kd===k?'on':''}" data-act="setKind" data-v="${k}">${l}</button>`).join('')}</div>`;
   const qb=(k,icon,label,c)=>`<button class="${open===k?'open':''} ${set[k]?'set':''}" ${c?`style="--c:${c}"`:''} data-act="panel" data-v="${k}" aria-label="${label}">${icon}</button>`;
   let panel='';
   if(open==='pupil')panel=`<div class="panel"><div class="lbl">Pour quel élève ?</div>${S.pupils.length?`<div class="chips"><button class="chip ${!d.pupilId?'on':''}" data-act="setPupil" data-v="">Aucun</button>${S.pupils.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>`<button class="chip ${d.pupilId===x.id?'on':''}" data-act="setPupil" data-v="${x.id}">${ICONS.person}${esc(x.name)}</button>`).join('')}</div>`:'<p class="hint">Ajoute d’abord des élèves dans l’onglet Classe.</p>'}</div>`;
   if(open==='subject')panel=`<div class="panel"><div class="lbl">Quelle matière ?</div><div class="chips"><button class="chip ${!d.subject?'on':''}" data-act="setSubject" data-v="">Aucune</button>${S.subjects.map(x=>`<button class="chip c ${d.subject===x.id?'on':''}" style="--c:${x.color}" data-act="setSubject" data-v="${x.id}"><i></i>${esc(x.name)}</button>`).join('')}</div></div>`;
   if(open==='when')panel=`<div class="panel"><div class="lbl">Pour quand ?</div><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${d.when===k&&!d.date?'on':''}" data-act="setWhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!d.when&&!d.date?'on':''}" data-act="setWhen" data-v="">Pas de date</button></div>
     <div style="margin-top:10px"><div class="lbl" style="margin-bottom:4px">Ou une date précise</div><input id="nd" type="date" value="${d.date||''}"></div>
-    ${isNew?`<div class="lbl" style="margin-top:14px">C’est…</div><div class="chips"><button class="chip ${d.todo?'on':''}" data-act="tgTodo">À faire</button><button class="chip ${d.isEvent?'on':''}" data-act="tgEvent">Un événement</button></div>${d.isEvent?`<div style="margin-top:10px"><div class="lbl" style="margin-bottom:4px">Heure (facultatif)</div><input id="nh" type="time" value="${d.time||''}"></div>`:''}`:''}
+    ${d.isEvent?`<div style="margin-top:14px"><div class="lbl" style="margin-bottom:4px">Heure (facultatif)</div><input id="nh" type="time" value="${d.time||''}"></div>`:''}
     <div class="lbl" style="margin-top:14px">Rappel</div><div class="chips">${REM.map(([v,l])=>`<button class="chip ${String(d.remind)===v?'on':''}" data-act="setRemind" data-v="${v}">${l}</button>`).join('')}</div>
     ${isNew&&(d.when||d.date)?`<div class="chips" style="margin-top:12px"><button class="chip ${d.repeat?'on':''}" data-act="tgRepeat">Répéter chaque semaine</button></div>`:''}</div>`;
   if(open==='photo'&&S.settings.modules.photos)panel=`<div class="panel"><div class="lbl">Photo</div><label class="btn ghost block" for="ph" style="cursor:pointer">${d.photo?'Changer la photo':'Prendre ou choisir une photo'}</label><input id="ph" type="file" accept="image/*" class="sr">${d.photo?`<img class="photo-full" src="${d.photo}" alt="Photo jointe">`:''}</div>`;
   const wl=d.date?(()=>{const x=fromYmd(d.date);return x.getDate()+' '+MC[x.getMonth()]})():((WHEN.find(w=>w[0]===d.when)||[])[1]||'');
-  const summary=[p?`<span class="pill plain">${ICONS.person}${esc(p.name)}</span>`:'',s?`<span class="pill" style="--c:${s.color}">${esc(s.name)}</span>`:'',wl?`<span class="pill plain">${wl}${d.isEvent&&d.time?' · '+d.time:''}</span>`:'',d.isEvent?'<span class="pill plain">événement</span>':''].join('');
+  const summary=[p?`<span class="pill plain">${ICONS.person}${esc(p.name)}</span>`:'',s?`<span class="pill" style="--c:${s.color}">${esc(s.name)}</span>`:'',wl?`<span class="pill plain">${wl}${d.isEvent&&d.time?' · '+d.time:''}</span>`:'',d.isEvent?'<span class="pill plain">événement</span>':'',d.obs?'<span class="pill plain">observation</span>':''].join('');
   return `<div class="field" style="margin-top:6px"><textarea id="nt" placeholder="Écris ou dicte avec le micro du clavier…" aria-label="Note">${esc(d.text)}</textarea></div>
-  <div class="qa">${qb('pupil',ICONS.person,'Élève',p?'var(--accent)':'')}${qb('subject',ICONS.tag,'Matière',s?s.color:'')}${qb('when',ICONS.agenda,'Quand')}${S.settings.modules.photos?qb('photo',ICONS.cam,'Photo'):''}</div>
+  ${kinds}
+  <div class="qa" style="margin-top:12px">${qb('pupil',ICONS.person,'Élève',p?'var(--accent)':'')}${qb('subject',ICONS.tag,'Matière',s?s.color:'')}${qb('when',ICONS.agenda,'Quand')}${S.settings.modules.photos?qb('photo',ICONS.cam,'Photo'):''}</div>
   ${summary?`<div class="pills" style="margin-top:10px">${summary}</div>`:''}${panel}`;
 }
 function renderSheet(){
@@ -653,16 +659,16 @@ function renderSheet(){
     const todo=mine.filter(n=>!n.done).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')),doneT=mine.filter(n=>n.done);
     const obs=p.notes.filter(x=>!x.noteId).slice().reverse();
     const nHist=pastEv.length+doneT.length;
-    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" data-drag="o:${x.ts}" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
+    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
     const sec=(t,n,c)=>`<h2 style="margin:16px 0 8px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></i>${t} <span class="n">${n}</span></h2>`;
     const ty=f.type||'note';
-    const lab={note:['Note','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
+    const lab={note:['Observation','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
     const lb='display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
     const age=p.birth&&p.birth.length===10?`<span style="color:var(--muted);font-size:14px">${agoYears(p.birth)} ans</span>`:'';
     body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Né(e) le</label><input id="pb" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa" data-pid="${p.id}" value="${fmtBirth(p.birth)}" style="flex:1">${age}</div>
     <div class="dz" data-zone="1" data-drop="ptype:todo">${sec('À faire',todo.length,'#E8590C')}${todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Rien à faire pour cet élève.</div>'}</div>
     <div class="dz" data-zone="1" data-drop="ptype:event">${sec('Événements',evs.length,'#1C7ED6')}${evs.length?evs.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement à venir.</div>'}</div>
-    ${pn?`<div class="dz" data-zone="1" data-drop="ptype:note">${sec('Notes',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore de note.</div>')}</div>`:''}
+    ${pn?`<div>${sec('Observations',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore d’observation.</div>')}</div>`:''}
     <div class="field" style="margin-top:20px"><label style="${lb}">Ajouter</label><div class="chips">${Object.keys(lab).map(k=>`<button class="chip ${ty===k?'on':''}" data-act="ptype" data-v="${k}">${lab[k][0]}</button>`).join('')}</div></div>
     <div class="field"><textarea id="pn" style="min-height:76px" placeholder="${lab[ty][1]}">${esc(f.text)}</textarea></div>
     ${ty==='todo'?`<div class="field"><label style="${lb}">Pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div><div style="margin-top:10px"><label for="pd" style="${lb}">Ou une date précise</label><input id="pd" type="date" value="${f.date||''}"></div></div>`:''}
@@ -685,7 +691,7 @@ function renderSheet(){
     <div class="field"><label for="tx">Message</label><textarea id="tx" style="min-height:190px">${esc(t.text)}</textarea><p class="hint">Écris {prénom} là où le prénom de l’élève doit apparaître.</p></div>
     <div style="display:flex;gap:10px;margin-top:20px">${t.id?'<button class="btn danger" data-act="delTpl">Supprimer</button>':'<button class="btn ghost" data-act="close">Annuler</button>'}<button class="btn block" data-act="saveTpl">Enregistrer</button></div>`;
   }
-  L.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">${body}</div></div>`;
+  L.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet ${sheet.type==='pupil'?'tall':''}" role="dialog" aria-modal="true">${body}</div></div>`;
 }
 
 function newDraft(){return {text:'',tag:'',subject:'',pupilId:'',when:'',date:'',photo:null,panel:'',done:false,isEvent:false,todo:true,time:'',remind:'',repeat:false}}
@@ -737,7 +743,7 @@ const ACT={
   openNote:(v,id)=>{
     const n=S.notes.find(x=>x.id===id);if(!n)return;
     const d={...n,when:whenOf(n),date:(n.due&&!whenOf(n))?n.due:'',panel:'',suggested:false,remind:(n.remind===undefined||n.remind==='')?'':String(n.remind),isEvent:false,todo:true,time:'',repeat:false};
-    if(n.inbox){const g=autoSort(n.text);let any=false;['subject','pupilId'].forEach(k=>{if(!d[k]&&g[k]){d[k]=g[k];any=true}});if(!d.when&&!d.date&&g.date){applyDate(d,g.date);any=true}if((!d.tag||d.tag==='autre')&&g.tag)d.tag=g.tag;d.suggested=any}
+    if(n.inbox){const g=autoSort(n.text);let any=false;['subject','pupilId'].forEach(k=>{if(!d[k]&&g[k]){d[k]=g[k];any=true}});if(!d.when&&!d.date&&g.date&&allowAutoDate(n.text)){applyDate(d,g.date);any=true}if((!d.tag||d.tag==='autre')&&g.tag)d.tag=g.tag;d.suggested=any}
     openSheet({type:'note',d});
   },
   panel:v=>{readNote();sheet.d.panel=sheet.d.panel===v?'':v;renderSheet()},
@@ -748,13 +754,18 @@ const ACT={
   saveNote:()=>{
     readNote();const d=sheet.d;
     if(!d.text.trim()&&!d.photo){toast('Écris quelques mots d’abord');return}
-    const isNew=!d.id,g=autoSort(d.text);
-    if(isNew&&!d.evTouched&&!d.isEvent&&g.time){d.isEvent=true;d.todo=false;if(!d.when&&!d.date&&!g.date)applyDate(d,ymd(new Date()))}
+    const isNew=!d.id,g=autoSort(d.text),okDate=allowAutoDate(d.text),verb=!okDate||startsWithVerb(d.text);
+    if(d.obs){
+      const pid=d.pupilId||g.pupilId,pu=pupil(pid);if(!pu){toast('Choisis un élève pour une observation');return}
+      if(!isNew){S.notes=S.notes.filter(x=>x.id!==d.id);S.pupils.forEach(q=>{q.notes=q.notes.filter(x=>x.noteId!==d.id)})}
+      pu.notes.push({ts:Date.now(),text:d.text.trim()});toast('Ajouté aux observations de '+pu.name);persist();sheet=null;render();return;
+    }
+    if(isNew&&!d.evTouched&&!d.isEvent&&g.time&&!verb){d.isEvent=true;d.todo=false;if(!d.when&&!d.date&&!g.date)applyDate(d,ymd(new Date()))}
     const manual=!!(d.subject||d.pupilId||d.when||d.date||d.isEvent);
     if(!d.pupilId&&g.pupilId)d.pupilId=g.pupilId;
     if(!d.tag||d.tag==='autre')d.tag=g.tag||'autre';
     let autoDate=false;
-    if(!d.when&&!d.date&&g.date){applyDate(d,g.date);autoDate=true}
+    if(!d.when&&!d.date&&g.date&&okDate){applyDate(d,g.date);autoDate=true}
     if(d.isEvent&&!d.time&&g.time)d.time=g.time;
     const due=d.date?d.date:dueFor(d.when);
     if(d.isEvent&&!due){toast('Choisis une date pour l’événement');return}
@@ -767,7 +778,8 @@ const ACT={
     if(d.isEvent){const k=norm(d.text);S.events.push({id:uid(),title:txt,pupilId:d.pupilId,date:due,time:d.time||'',kind:/reunion|conseil/.test(k)?'reunion':/rdv|rendez/.test(k)?'rdv':/date limite|rendre|avant le/.test(k)?'echeance':'autre',remind:rem});agSel=due;msg='Ajouté à l’agenda : '+frDate(fromYmd(due))+(d.time?' à '+d.time:'')}
     if(d.repeat&&due&&isNew&&d.isEvent){weeklyCopies(S.events[S.events.length-1],9);msg='Ajouté à l’agenda, chaque semaine'}
     else if(d.repeat&&due&&isNew){S.recurring.push({id:uid(),text:txt,day:fromYmd(due).getDay(),subject:d.subject,gen:[due]});msg='Noté, chaque semaine'}
-    if(!isNew){const n=S.notes.find(x=>x.id===d.id);if(n){Object.assign(n,base);syncPupil(n)}msg=base.inbox?'Gardée dans « À trier »':'Rangée'}
+    if(!isNew&&d.isEvent&&!d.todo){S.notes=S.notes.filter(x=>x.id!==d.id);S.pupils.forEach(q=>{q.notes=q.notes.filter(x=>x.noteId!==d.id)});msg='Transformée en événement : '+frDate(fromYmd(due))}
+    else if(!isNew){const n=S.notes.find(x=>x.id===d.id);if(n){Object.assign(n,base);syncPupil(n)}msg=base.inbox?'Gardée dans « À trier »':'Rangée'}
     else if(keep){const n={id:uid(),ts:Date.now(),done:false,...base};S.notes.unshift(n);syncPupil(n)}
     toast(msg);persist();sheet=null;render();
   },
@@ -779,6 +791,7 @@ const ACT={
   delQuickE:(v,id)=>{S.events=S.events.filter(x=>x.id!==id);persist();render();toast('Supprimé · touche ↩ pour annuler')},
   stab:v=>{setTab=v;render()},
   gomsgs:()=>{classMode='msgs';setView('class')},
+  setKind:v=>{readNote();const d=sheet.d;d.evTouched=true;d.todo=v==='todo';d.isEvent=v==='event';d.obs=v==='obs';if(v==='event'&&!d.when&&!d.date)applyDate(d,ymd(new Date()));renderSheet()},
   tgTodo:()=>{readNote();const d=sheet.d;d.evTouched=true;d.todo=!d.todo;if(!d.todo&&!d.isEvent)d.isEvent=true;renderSheet()},
   tgEvent:()=>{readNote();const d=sheet.d;d.evTouched=true;d.isEvent=!d.isEvent;if(!d.isEvent)d.todo=true;renderSheet()},
   setRemind:v=>{readNote();sheet.d.remind=v;renderSheet()},
@@ -816,7 +829,7 @@ const ACT={
     if(!p||!t){toast('Écris quelques mots d’abord');return}
     if(ty==='event'){if(!f.date){toast('Choisis une date');return}S.events.push({id:uid(),title:t,pupilId:p.id,date:f.date,time:f.time||'',kind:'rdv',remind:''});toast('Ajouté à l’agenda')}
     else if(ty==='todo'){const n={id:uid(),text:t,tag:'eleve',ts:Date.now(),before:false,done:false,due:f.date?f.date:dueFor(f.when),photo:null,subject:'',pupilId:p.id,inbox:false};S.notes.unshift(n);syncPupil(n);toast('Ajouté à « À faire »')}
-    else{p.notes.push({ts:Date.now(),text:t});toast('Note enregistrée')}
+    else{p.notes.push({ts:Date.now(),text:t});toast('Observation enregistrée')}
     sheet.f={type:ty,text:'',when:'',date:'',time:''};persist();renderSheet();render();
   },
   ptype:v=>{readPupil();sheet.f.type=v;sheet.f.date='';sheet.f.when='';renderSheet()},
@@ -850,7 +863,7 @@ const MUT=new Set(['saveRes','delRes','reportMon','setColor','toggle','saveNote'
 let swJust=false;
 function convertTo(kind,id,target){
   const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;
-  const same=(kind==='n'&&target==='todo')||(kind==='e'&&target==='event')||(kind==='o'&&target==='note');if(same)return;
+  if(target==='note')return;const same=(kind==='n'&&target==='todo')||(kind==='e'&&target==='event');if(same)return;
   let text='',due='',ts=0;
   if(kind==='n'){const n=S.notes.find(x=>x.id===id);if(!n)return;text=n.text;due=n.due||''}
   else if(kind==='e'){const e=S.events.find(x=>x.id===id);if(!e)return;text=e.title;due=e.date}

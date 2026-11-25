@@ -154,6 +154,7 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .rem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,#E5A100 14%,var(--surface));border:1px solid color-mix(in srgb,#E5A100 40%,var(--line));margin-bottom:8px}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
 .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.gal button{aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--soft)}.gal img{width:100%;height:100%;object-fit:cover;display:block}
+.addrow{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:46px;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:14px;color:var(--accent);font-weight:700;margin:2px 0 6px;text-align:center}
 </style>
 </head>
 <body>
@@ -381,13 +382,18 @@ function vToday(){
   if(M.agenda){
     const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
     h+=`<h2>Événements <span class="n">${ev.length}</span></h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement '+(isT?'aujourd’hui':'ce jour-là')+'.</div>');
-    const late=S.events.filter(e=>e.kind==='echeance'&&e.date>today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
-    if(late.length&&isT)h+='<h2>Dates limites à venir</h2>'+late.map(e=>eventCard(e)).join('');
+    h+='<button class="addrow" data-act="addEventDay">+ Ajouter un événement</button>';
   }
   const todo=sorted.filter(n=>isT?(n.due&&n.due<=today):n.due===tDay).sort((a,b)=>(b.before-a.before)||a.due.localeCompare(b.due)||b.ts-a.ts);
   h+=`<h2>À faire <span class="n">${todo.length}</span></h2>`+(todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">'+(isT?'Tout est fait pour aujourd’hui.':'Rien de prévu ce jour-là.')+'</div>');
-  const soon=sorted.filter(n=>n.due>today).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,4);
-  if(soon.length&&isT)h+='<h2>À venir</h2>'+soon.map(n=>itemRow(n)).join('');
+  h+='<button class="addrow" data-act="addTask">+ Ajouter une tâche</button>';
+  if(isT){
+    const tm=ymd(addDays(now,1)),end=ymd(addDays(now,7));
+    const tev=S.events.filter(e=>e.date===tm).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99')),tt=sorted.filter(n=>n.due===tm);
+    h+=`<h2>Demain · ${frDate(addDays(now,1))}</h2>`+((tev.length||tt.length)?tev.map(e=>eventCard(e)).join('')+tt.map(n=>itemRow(n)).join(''):'<div class="empty">Rien de prévu demain.</div>');
+    const arr=[...S.events.filter(e=>e.date>tm&&e.date<=end).map(e=>({d:e.date,t:e.time||'97',h:eventCard(e)})),...sorted.filter(n=>n.due>tm&&n.due<=end).map(n=>({d:n.due,t:'98',h:itemRow(n)}))].sort((a,b)=>a.d.localeCompare(b.d)||a.t.localeCompare(b.t));
+    if(arr.length)h+=`<h2>Cette semaine <span class="n">${arr.length}</span></h2>`+arr.map(x=>x.h).join('');
+  }
   if(S.demo)h+=`<div class="demo">Ces notes sont des <b>données de démonstration</b> inspirées d’une vraie journée de classe. <button data-act="clearDemo">Les effacer</button></div>`;
   return h;
 }
@@ -635,6 +641,8 @@ const ACT={
   delRec:(v,id)=>{S.recurring=S.recurring.filter(r=>r.id!==id);S.notes=S.notes.filter(n=>!(n.recId===id&&!n.done));persist();render()},
   delNote:(v,id)=>{S.notes=S.notes.filter(x=>x.id!==id);S.pupils.forEach(p=>{p.notes=p.notes.filter(x=>x.noteId!==id)});persist();sheet=null;render()},
   doneNote:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;persist()}sheet=null;render()},
+  addEventDay:()=>openSheet({type:'event',d:{title:'',date:tDay,time:'',kind:'rdv'}}),
+  addTask:()=>{const d=newDraft();applyDate(d,tDay);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
   addEvent:()=>openSheet({type:'event',d:{title:'',date:agSel,time:'',kind:'rdv'}}),
   openEvent:(v,id)=>{const e=S.events.find(x=>x.id===id);if(e)openSheet({type:'event',d:{...e}})},
   ekind:v=>{const e=sheet.d;e.title=$('#et').value;e.date=$('#ed').value;e.time=$('#eh').value;e.kind=v;renderSheet()},

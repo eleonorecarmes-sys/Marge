@@ -417,7 +417,6 @@ function vToday(){
   return h;
 }
 
-const QADD='<div class="qwrap"><input class="qadd" placeholder="Écrire ici pour ajouter une tâche…" enterkeyhint="done" autocomplete="off"><button class="qok" data-act="qok">Ajouter</button></div>';
 function vTodo(){
   const q=qTodo.trim(),today=ymd(new Date()),wkEnd=ymd(addDays(new Date(),7));
   let list=S.notes.slice();

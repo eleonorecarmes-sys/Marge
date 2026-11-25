@@ -591,7 +591,6 @@ function renderSheet(){
     ${S.pupils.length?`<div class="field"><label>Élève</label><div class="chips"><button class="chip ${!e.pupilId?'on':''}" data-act="epupil" data-v="">Aucun</button>${S.pupils.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>`<button class="chip ${e.pupilId===x.id?'on':''}" data-act="epupil" data-v="${x.id}">${ICONS.person}${esc(x.name)}</button>`).join('')}</div></div>`:''}
     <div class="field"><label>Rappel</label><div class="chips">${REM.map(([v,l])=>`<button class="chip ${String(e.remind??'')===v?'on':''}" data-act="erem" data-v="${v}">${l}</button>`).join('')}</div></div>
     ${e.id?'':`<div class="chips" style="margin-top:4px"><button class="chip ${e.repeat?'on':''}" data-act="erepeat">Répéter chaque semaine</button></div>`}
-    <button class="btn ghost block" style="margin-top:14px" data-act="ics">Ajouter au calendrier de l’iPad (avec alarme)</button>
     <div style="display:flex;gap:10px;margin-top:20px">${e.id?'<button class="btn danger" data-act="delEvent">Supprimer</button>':'<button class="btn ghost" data-act="close">Annuler</button>'}<button class="btn block" data-act="saveEvent">Enregistrer</button></div>`;
   }else if(sheet.type==='pupil'){
     const p=pupil(sheet.id);if(!p){sheet=null;L.innerHTML='';return}

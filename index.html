@@ -552,7 +552,7 @@ function vSettings(){
     mod('agenda','Agenda','Semaine, mois, événements et dates limites')+
     mod('notes','À faire','Tes notes et tâches, triées par matière')+
     mod('class','Classe','La liste des élèves')+
-    mod('pupilNotes','Observations par élève','Ce que tu notes sur chaque élève, sans jamais le modifier')+
+    mod('pupilNotes','Observations par élève','Ce que tu notes sur chaque élève, daté')+
     mod('ideas','Idées','Une zone de texte pour les idées de tes élèves')+
     mod('res','Ressources','Garder les liens des sites utiles, par matière')+
     mod('photos','Photos','Joindre une photo à une note, et la retrouver dans la galerie'))+`<h2>Idées pour plus tard</h2>`+card(soon('Notifications qui sonnent','Des rappels même quand l’appli est fermée')+soon('Synchro entre appareils','Ordinateur, tablette et téléphone')+soon('Partage avec les collègues','Envoyer une liste à une collègue')+soon('Tri automatique des photos','Lire et classer une page de cahier'))+'<p class="hint">Ces fonctions ne sont pas encore là. Dis-moi lesquelles te donneraient envie de les activer.</p>';
@@ -662,7 +662,7 @@ function renderSheet(){
     const todo=mine.filter(n=>!n.done).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')),doneT=mine.filter(n=>n.done);
     const obs=p.notes.filter(x=>!x.noteId).slice().reverse();
     const nHist=pastEv.length+doneT.length;
-    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
+    const nrow=x=>{const d=new Date(x.ts);return `<div class="item" data-drag="o:${x.ts}" style="--c:${NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} ${d.getFullYear()}</span></div></div></div>`};
     const sec=(t,n,c)=>`<h2 style="margin:16px 0 8px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></i>${t} <span class="n">${n}</span></h2>`;
     const ty=f.type||'note';
     const lab={note:['Observation','Ex. a oublié son cahier, souci de comportement…'],todo:['À faire','Ex. prévenir les parents, préparer une fiche…'],event:['Événement','Ex. rendez-vous parents, orthophoniste…']};
@@ -671,7 +671,7 @@ function renderSheet(){
     body=`<div class="grab"></div><h3>${esc(p.name)}</h3><div style="display:flex;align-items:center;gap:10px;margin:2px 0 4px"><label for="pb" style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Né(e) le</label><input id="pb" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa" data-pid="${p.id}" value="${fmtBirth(p.birth)}" style="flex:1">${age}</div>
     <div class="dz" data-zone="1" data-drop="ptype:todo">${sec('À faire',todo.length,'#E8590C')}${todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">Rien à faire pour cet élève.</div>'}</div>
     <div class="dz" data-zone="1" data-drop="ptype:event">${sec('Événements',evs.length,'#1C7ED6')}${evs.length?evs.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement à venir.</div>'}</div>
-    ${pn?`<div>${sec('Observations',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore d’observation.</div>')}</div>`:''}
+    ${pn?`<div class="dz" data-zone="1" data-drop="ptype:note">${sec('Observations',obs.length,'#868E96')+(obs.length?obs.map(nrow).join(''):'<div class="empty">Pas encore d’observation.</div>')}</div>`:''}
     <div class="field" style="margin-top:20px"><label style="${lb}">Ajouter</label><div class="chips">${Object.keys(lab).map(k=>`<button class="chip ${ty===k?'on':''}" data-act="ptype" data-v="${k}">${lab[k][0]}</button>`).join('')}</div></div>
     <div class="field"><textarea id="pn" style="min-height:76px" placeholder="${lab[ty][1]}">${esc(f.text)}</textarea></div>
     ${ty==='todo'?`<div class="field"><label style="${lb}">Pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div><div style="margin-top:10px"><label for="pd" style="${lb}">Ou une date précise</label><input id="pd" type="date" value="${f.date||''}"></div></div>`:''}
@@ -872,7 +872,7 @@ const MUT=new Set(['addIdea','saveIdea','delIdea','saveRes','delRes','reportMon'
 let swJust=false;
 function convertTo(kind,id,target){
   const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;
-  if(target==='note')return;const same=(kind==='n'&&target==='todo')||(kind==='e'&&target==='event');if(same)return;
+  const same=(kind==='n'&&target==='todo')||(kind==='e'&&target==='event')||(kind==='o'&&target==='note');if(same)return;
   let text='',due='',ts=0;
   if(kind==='n'){const n=S.notes.find(x=>x.id===id);if(!n)return;text=n.text;due=n.due||''}
   else if(kind==='e'){const e=S.events.find(x=>x.id===id);if(!e)return;text=e.title;due=e.date}

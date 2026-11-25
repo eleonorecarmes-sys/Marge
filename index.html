@@ -155,7 +155,8 @@ nav .plus svg{width:28px;height:28px;stroke:var(--accent-ink)}
 .rem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,#E5A100 14%,var(--surface));border:1px solid color-mix(in srgb,#E5A100 40%,var(--line));margin-bottom:8px}
 .rem .body{flex:1;min-width:0}.rem b{display:block;overflow-wrap:anywhere}.rem span{font-size:13px;color:var(--muted);font-weight:600}.rem .btn{min-height:40px;padding:0 14px}
 .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.gal button{aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--soft)}.gal img{width:100%;height:100%;object-fit:cover;display:block}
-.addrow{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:46px;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:14px;color:var(--accent);font-weight:700;margin:2px 0 6px;text-align:center}
+.addrow{display:grid;place-items:center;width:42px;height:42px;margin:2px 0 6px auto;border-radius:50%;background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line))}
+.addrow svg{width:22px;height:22px;stroke:currentColor}
 .swipe{position:relative;margin-bottom:8px;border-radius:14px;overflow:hidden}
 .swipe .item,.swipe .evc{margin-bottom:0;position:relative;transition:transform .18s ease;touch-action:pan-y}
 .swipe.moving .item,.swipe.moving .evc{transition:none}
@@ -396,11 +397,11 @@ function vToday(){
   if(M.agenda){
     const ev=S.events.filter(e=>e.date===tDay).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
     h+=`<h2>Événements <span class="n">${ev.length}</span></h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement '+(isT?'aujourd’hui':'ce jour-là')+'.</div>');
-    h+='<button class="addrow" data-act="addEventDay">+ Ajouter un événement</button>';
+    h+=`<button class="addrow" data-act="addEventDay" aria-label="Ajouter un événement">${ICONS.plus}</button>`;
   }
   const todo=sorted.filter(n=>isT?(n.due&&n.due<=today):n.due===tDay).sort((a,b)=>(b.before-a.before)||a.due.localeCompare(b.due)||b.ts-a.ts);
   h+=`<h2>À faire <span class="n">${todo.length}</span></h2>`+(todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">'+(isT?'Tout est fait pour aujourd’hui.':'Rien de prévu ce jour-là.')+'</div>');
-  h+='<button class="addrow" data-act="addTask">+ Ajouter une tâche</button>';
+  h+=`<button class="addrow" data-act="addTask" aria-label="Ajouter une tâche">${ICONS.plus}</button>`;
   if(isT){
     const tm=ymd(addDays(now,1)),end=ymd(addDays(now,7));
     const tev=S.events.filter(e=>e.date===tm).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99')),tt=sorted.filter(n=>n.due===tm);
@@ -448,7 +449,7 @@ function vAgenda(){
   h+=`<h2>${cap(frDate(sel))}</h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement ce jour-là.</div>');
   const dn=S.notes.filter(n=>n.due===agSel&&!n.done&&!n.inbox);
   if(dn.length)h+=`<h2>À faire <span class="n">${dn.length}</span></h2>`+dn.map(n=>itemRow(n)).join('');
-  h+=`<button class="btn block" style="margin-top:14px" data-act="addEvent">Ajouter un événement</button>`;
+  h+=`<button class="addrow" style="margin-top:12px" data-act="addEvent" aria-label="Ajouter un événement">${ICONS.plus}</button>`;
   return h;
 }
 
@@ -582,13 +583,20 @@ function renderSheet(){
   }else if(sheet.type==='pupil'){
     const p=pupil(sheet.id);if(!p){sheet=null;L.innerHTML='';return}
     const pn=S.settings.modules.pupilNotes,f=sheet.f;
-    const evs=S.events.filter(e=>e.pupilId===p.id).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+    const nowT=new Date(),td=ymd(nowT),hm=pad(nowT.getHours())+':'+pad(nowT.getMinutes());
+    const past=e=>e.date<td||(e.date===td&&e.time&&e.time<hm);
+    const allEv=S.events.filter(e=>e.pupilId===p.id).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+    const evs=allEv.filter(e=>!past(e)),pastEv=allEv.filter(past).reverse();
+    const row=x=>{const d=new Date(x.ts),ln=x.noteId?S.notes.find(q=>q.id===x.noteId):null;return `<div class="item ${ln&&ln.done?'done':''}" style="--c:${ln?colorOf(ln):NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${ln?dueLabel(ln)+(ln.done?'<span class="pill plain">fait</span>':''):''}</div></div></div>`};
+    const isDone=x=>{const ln=x.noteId&&S.notes.find(q=>q.id===x.noteId);return !!(ln&&ln.done)};
+    const act=p.notes.filter(x=>!isDone(x)),doneN=p.notes.filter(isDone).reverse(),nHist=pastEv.length+doneN.length;
     body=`<div class="grab"></div><h3>${esc(p.name)}</h3>${evs.length?`<h2 style="margin:14px 0 8px">Événements <span class="n">${evs.length}</span></h2>`+evs.map(e=>eventCard(e)).join(''):''}${pn?'<p class="sub">Notes de suivi</p>':''}
-    ${pn?(p.notes.length?p.notes.slice().reverse().map(x=>{const d=new Date(x.ts),ln=x.noteId?S.notes.find(q=>q.id===x.noteId):null;return `<div class="item ${ln&&ln.done?'done':''}" style="--c:${ln?colorOf(ln):NEUTRAL}"><div class="body"><div class="txt">${esc(x.text)}</div><div class="pills"><span class="pill plain">${d.getDate()} ${MC[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${ln?dueLabel(ln)+(ln.done?'<span class="pill plain">fait</span>':''):''}</div></div></div>`}).join(''):'<div class="empty">Pas encore de note.</div>'):''}
+    ${pn?(act.length?act.slice().reverse().map(row).join(''):'<div class="empty">Pas encore de note.</div>'):''}
     ${pn?`<div class="field"><label for="pn">Ajouter une note</label><textarea id="pn" style="min-height:80px" placeholder="Ex. a oublié son cahier, rendez-vous à prévoir…">${esc(f.text)}</textarea></div>
     <div class="field"><label>À faire pour quand ?</label><div class="chips">${WHEN.map(([k,l])=>`<button class="chip ${f.when===k&&!f.date?'on':''}" data-act="pwhen" data-v="${k}">${l}</button>`).join('')}<button class="chip ${!f.when&&!f.date?'on':''}" data-act="pwhen" data-v="">Pas de date</button></div>
     <div style="margin-top:10px"><label for="pd" style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Ou avant une date précise</label><input id="pd" type="date" value="${f.date||''}"></div>
     <p class="hint">Avec une date, la note apparaît aussi dans « À faire » et dans l’agenda.</p></div>`:''}
+    ${nHist?`<button class="link" data-act="phist" style="margin-top:14px">${sheet.hist?'Masquer':'Voir'} l’historique (${nHist})</button>${sheet.hist?pastEv.map(e=>eventCard(e)).join('')+doneN.map(row).join(''):''}`:''}
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delPupil" data-id="${p.id}">Retirer</button>${pn?'<button class="btn ghost" data-act="close">Fermer</button><button class="btn block" data-act="savePupilNote" data-id="'+p.id+'">Enregistrer la note</button>':'<button class="btn block" data-act="close">Fermer</button>'}</div>`;
   }else if(sheet.type==='tpl'){
     const t=sheet.d;
@@ -660,6 +668,7 @@ const ACT={
     else if(keep){const n={id:uid(),ts:Date.now(),done:false,...base};S.notes.unshift(n);syncPupil(n)}
     toast(msg);persist();sheet=null;render();
   },
+  phist:()=>{readPupil();sheet.hist=!sheet.hist;renderSheet()},
   gsearch:()=>{openSheet({type:'search',q:''});setTimeout(()=>{const c=$('#gq');c&&c.focus()},60)},
   undo:()=>{const h=hist.pop();if(h){redo.push(JSON.stringify(S));S=JSON.parse(h);ensure();applyTheme();persist();sheet=null;render();toast('Action annulée')}},
   redo:()=>{const h=redo.pop();if(h){hist.push(JSON.stringify(S));S=JSON.parse(h);ensure();applyTheme();persist();sheet=null;render();toast('Action rétablie')}},

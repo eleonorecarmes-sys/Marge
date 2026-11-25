@@ -684,7 +684,7 @@ function renderSheet(){
     const o=sheet.d,pu=pupil(o.pid);
     body=`<div class="grab"></div><h3>Observation${pu?' · '+esc(pu.name):''}</h3>
     <div class="field"><label for="ot">Texte</label><textarea id="ot" style="min-height:110px">${esc(o.text)}</textarea></div>
-    <div class="field"><label for="od">Date</label><input id="od" class="bin" inputmode="numeric" maxlength="10" placeholder="jj/mm/aaaa" value="${o.date}"></div>
+    <div class="field"><label for="od">Date</label><input id="od" type="date" value="${o.date}"></div>
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delObs" data-id="${o.ts}">Supprimer</button><button class="btn ghost" data-act="backPupil">Annuler</button><button class="btn block" data-act="saveObs">Enregistrer</button></div>`;
   }else if(sheet.type==='idea'){
     body=`<div class="grab"></div><h3>Idée</h3><div class="field"><textarea id="iet" style="min-height:120px">${esc(sheet.d.text)}</textarea></div><div style="display:flex;gap:10px;margin-top:16px"><button class="btn danger" data-act="delIdea">Supprimer</button><button class="btn block" data-act="saveIdea">Enregistrer</button></div>`;
@@ -732,9 +732,9 @@ function icsOf(e,rep){
 const ACT={
   view:v=>setView(v),
   editObs:(v,id)=>{const pu=sheet&&sheet.type==='pupil'?pupil(sheet.id):null;if(!pu)return;const o=pu.notes.find(x=>String(x.ts)===id&&!x.noteId);if(!o)return;const d=new Date(o.ts);
-    openSheet({type:'obs',d:{pid:pu.id,ts:o.ts,text:o.text,date:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()}})},
+    openSheet({type:'obs',d:{pid:pu.id,ts:o.ts,text:o.text,date:ymd(d)}})},
   backPupil:()=>{const pid=sheet.d.pid;openSheet({type:'pupil',id:pid,f:{type:'note',text:'',when:'',date:'',time:''}})},
-  saveObs:()=>{const o=sheet.d,pu=pupil(o.pid),t=$('#ot').value.trim(),dt=parseDMY($('#od').value);if(!t){toast('Écris l’observation d’abord');return}if(!dt){toast('Date non reconnue, écris par exemple 09/10/2026');return}
+  saveObs:()=>{const o=sheet.d,pu=pupil(o.pid),t=$('#ot').value.trim(),dt=$('#od').value?fromYmd($('#od').value):null;if(!t){toast('Écris l’observation d’abord');return}if(!dt){toast('Choisis une date');return}
     const x=pu&&pu.notes.find(q=>String(q.ts)===String(o.ts)&&!q.noteId);if(x){const old=new Date(x.ts);dt.setHours(old.getHours(),old.getMinutes(),old.getSeconds(),old.getMilliseconds());x.text=t;x.ts=dt.getTime()}
     persist();ACT.backPupil();render()},
   addRes:()=>{openSheet({type:'res',d:{url:'',desc:'',subject:''}});setTimeout(()=>{const c=$('#ru');c&&c.focus()},60)},

@@ -393,11 +393,12 @@ function itemRow(n,q=''){
     <button class="chk ${n.done?'on':''}" data-act="toggle" data-id="${n.id}" aria-label="Fait">${ICONS.check}</button>
     <button class="body" data-act="openNote" data-id="${n.id}">
       <div class="txt">${hl(n.text,q)}</div>
-      <div class="pills">${n.inbox&&!n.done?'<span class="pill" style="--c:var(--accent)">à trier</span>':''}${p?`<span class="pill plain">${ICONS.person}${esc(p.name)}</span>`:''}${s?`<span class="pill">${esc(s.name)}</span>`:''}${dueLabel(n)}</div>
+      <div class="pills">${n.inbox&&!n.done?'<span class="pill" style="--c:var(--accent)">à trier</span>':''}${p?`<span class="pill plain">${ICONS.person}${esc(p.name)}</span>`:''}${s?`<span class="pill">${esc(s.name)}</span>`:''}${n.done?`<span class="pill plain">fait le ${doneOn(n)?(d=>d.getDate()+' '+MC[d.getMonth()])(fromYmd(doneOn(n))):''}</span>`:(n.carried?'<span class="pill plain">reportée</span>':'')}${dueLabel(n)}</div>
     </button>${n.photo?`<img class="thumb" src="${n.photo}" alt="">`:''}</div></div>`;
 }
 const isPastEv=e=>{const now=new Date(),t=ymd(now);if(e.date<t)return true;if(e.date>t||!e.time)return false;const[h,m]=e.time.split(':').map(Number);return now.getHours()*60+now.getMinutes()>=h*60+m+30};
-const recentDone=n=>{if(!n.done||n.inbox)return false;const t=ymd(new Date()),s0=new Date();s0.setHours(0,0,0,0);return (n.doneAt||0)>=s0.getTime()||(!!n.due&&n.due>=t)};
+const doneOn=n=>n.doneDay||(n.doneAt?ymd(new Date(n.doneAt)):(n.due||''));
+function rollover(){if(S.settings.rollover===false)return;const t=ymd(new Date());let ch=false;S.notes.forEach(n=>{if(!n.done&&!n.inbox&&n.due&&n.due<t){n.due=t;n.carried=(n.carried||0)+1;ch=true}});if(ch)persist()}
 const doneLast=(a,b)=>(a.done?1:0)-(b.done?1:0);
 function eventCard(e,q=''){
   const [lab,c]=EV[e.kind]||EV.autre;
@@ -432,13 +433,13 @@ function vToday(){
     h+=`<h2>Événements <span class="n">${ev.length}</span></h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement '+(isT?'aujourd’hui':'ce jour-là')+'.</div>');
     h+=`<button class="addrow" data-act="addEventDay" aria-label="Ajouter un événement">${ICONS.plus}</button>`;
   }
-  const pool=S.notes.filter(n=>!n.inbox&&(!n.done||recentDone(n)));
-  const todo=pool.filter(n=>isT?(n.due&&n.due<=today):n.due===tDay).sort((a,b)=>doneLast(a,b)||(b.before-a.before)||a.due.localeCompare(b.due)||b.ts-a.ts);
+  const pool=S.notes.filter(n=>!n.inbox&&!n.done);
+  const todo=[...pool.filter(n=>isT?(n.due&&n.due<=today):n.due===tDay),...S.notes.filter(n=>n.done&&!n.inbox&&doneOn(n)===tDay)].sort((a,b)=>doneLast(a,b)||(b.before-a.before)||a.due.localeCompare(b.due)||b.ts-a.ts);
   h+=`<h2>À faire <span class="n">${todo.filter(n=>!n.done).length}</span></h2>`+(todo.length?todo.map(n=>itemRow(n)).join(''):'<div class="empty">'+(isT?'Tout est fait pour aujourd’hui.':'Rien de prévu ce jour-là.')+'</div>');
   h+=`<button class="addrow" data-act="addTask" aria-label="Ajouter une tâche">${ICONS.plus}</button>`;
   if(isT){
     const tm=ymd(addDays(now,1)),end=ymd(addDays(now,7));
-    const arr=[...S.events.filter(e=>e.date>today&&e.date<=end).map(e=>({d:e.date,t:e.time||'97',h:eventCard(e)})),...pool.filter(n=>n.due>today&&n.due<=end).map(n=>({d:n.due,t:n.done?'99':'98',h:itemRow(n)}))].sort((a,b)=>a.d.localeCompare(b.d)||a.t.localeCompare(b.t));
+    const arr=[...S.events.filter(e=>e.date>today&&e.date<=end).map(e=>({d:e.date,t:e.time||'97',h:eventCard(e)})),...pool.filter(n=>n.due>today&&n.due<=end).map(n=>({d:n.due,t:'98',h:itemRow(n)}))].sort((a,b)=>a.d.localeCompare(b.d)||a.t.localeCompare(b.t));
     if(arr.length)h+=`<h2>Cette semaine <span class="n">${arr.length}</span></h2>`+arr.map(x=>x.h).join('');
   }
   if(isT&&!(now.getDay()===5||now.getDay()===6||now.getDay()===0))h+=`<p style="text-align:center;margin:18px 0 4px"><button class="link" data-act="bilan">Bilan de la semaine</button></p>`;
@@ -451,9 +452,9 @@ function vTodo(){
   let list=S.notes.slice();
   if(fSubj==='none')list=list.filter(n=>!n.subject);else if(fSubj)list=list.filter(n=>n.subject===fSubj);
   if(q)list=list.filter(n=>matchNote(n,q));
-  const open=list.filter(n=>!n.done),done=list.filter(n=>n.done&&!recentDone(n));
-  const inbox=open.filter(n=>n.inbox).sort((a,b)=>b.ts-a.ts),rest=list.filter(n=>!n.inbox&&(!n.done||recentDone(n)));
-  const g=[['En retard',rest.filter(n=>n.due&&n.due<today),true],['Aujourd’hui',rest.filter(n=>n.due===today),false],['Cette semaine',rest.filter(n=>n.due>today&&n.due<=wkEnd),false],['Plus tard',rest.filter(n=>n.due>wkEnd),false],['Sans date',rest.filter(n=>!n.due),false]];
+  const open=list.filter(n=>!n.done),done=list.filter(n=>n.done&&!(doneOn(n)===today&&!n.inbox));
+  const inbox=open.filter(n=>n.inbox).sort((a,b)=>b.ts-a.ts),rest=open.filter(n=>!n.inbox),doneToday=list.filter(n=>n.done&&!n.inbox&&doneOn(n)===today);
+  const g=[['En retard',rest.filter(n=>n.due&&n.due<today),true],['Aujourd’hui',[...rest.filter(n=>n.due===today),...doneToday],false],['Cette semaine',rest.filter(n=>n.due>today&&n.due<=wkEnd),false],['Plus tard',rest.filter(n=>n.due>wkEnd),false],['Sans date',rest.filter(n=>!n.due),false]];
   const totalOpen=S.notes.filter(n=>!n.done).length;
   let h=`<div class="top"><div><h1>À faire</h1><p class="sub">${totalOpen} à faire · ${S.notes.filter(n=>n.inbox&&!n.done).length} à trier</p></div>${gear()}</div>
   <div class="search">${ICONS.search}<input id="qt" type="search" placeholder="Chercher dans mes notes…" value="${esc(qTodo)}" autocomplete="off"></div>
@@ -479,7 +480,7 @@ function vAgenda(){
     for(let i=0;i<7;i++){
       const d=addDays(mon,i),k=ymd(d);
       const ev=S.events.filter(e=>e.date===k).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
-      const tk=S.notes.filter(n=>n.due===k&&!n.inbox).sort(doneLast);
+      const tk=S.notes.filter(n=>!n.inbox&&(n.done?doneOn(n)===k:n.due===k)).sort(doneLast);
       const bd=S.pupils.filter(x=>x.birth&&x.birth.slice(-5)===k.slice(5));
       const lines=bd.map(x=>`<div class="wl"><span class="wt">🎂</span><span class="wx">Anniversaire de ${esc(x.name)}</span></div>`).join('')
         +ev.map(e=>{const c=(EV[e.kind]||EV.autre)[1],pu=pupil(e.pupilId);return `<button class="wl ev ${isPastEv(e)?'past':''}" data-drag="e:${e.id}" style="--c:${c}" data-act="openEvent" data-id="${e.id}"><span class="wt">${e.time||'Jour'}</span><span class="wx">${esc(e.title)}${pu?' · '+esc(pu.name):''}</span></button>`}).join('')
@@ -495,7 +496,7 @@ function vAgenda(){
   }
   const ev=S.events.filter(e=>e.date===agSel).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
   h+=`<h2>${cap(frDate(sel))}</h2>`+(ev.length?ev.map(e=>eventCard(e)).join(''):'<div class="empty">Aucun événement ce jour-là.</div>');
-  const dn=S.notes.filter(n=>n.due===agSel&&!n.inbox).sort(doneLast);
+  const dn=S.notes.filter(n=>!n.inbox&&(n.done?doneOn(n)===agSel:n.due===agSel)).sort(doneLast);
   if(dn.length)h+=`<h2>À faire <span class="n">${dn.length}</span></h2>`+dn.map(n=>itemRow(n)).join('');
   h+=`<button class="addrow" style="margin-top:12px" data-act="addEvent" aria-label="Ajouter une tâche ou un événement">${ICONS.plus}</button>`;
   return h;
@@ -562,7 +563,7 @@ function vSettings(){
   const intro={app:'La couleur de l’appli, le mode clair ou sombre et le nom de ta classe.',subj:'Les matières et leur couleur, pour classer tes tâches.',fn:'Choisis ce qui apparaît dans Marge. Ce que tu désactives disparaît des onglets.',rec:'Des tâches qui reviennent toutes seules chaque semaine dans « À faire ».',msg:'Les modèles de messages aux parents.',data:'Tout reste sur cet appareil. Rien n’est envoyé sur Internet.'};
   let b='';
   if(setTab==='app')b=card(`<div class="setrow" style="flex-wrap:wrap;gap:6px;justify-content:space-between">${ACCENTS.map(a=>`<button class="sw ${st.accent===a[0]?'on':''}" data-act="accent" data-v="${a[0]}" aria-label="${a[1]}"><i style="background:${a[2]}"></i></button>`).join('')}</div>
-    <div class="setrow"><div class="main"><b>Apparence</b></div><div class="seg"><button class="${st.theme==='light'?'on':''}" data-act="th" data-v="light">Clair</button><button class="${st.theme==='dark'?'on':''}" data-act="th" data-v="dark">Sombre</button><button class="${st.theme==='auto'?'on':''}" data-act="th" data-v="auto">Auto</button></div></div><div class="setrow" style="display:block"><div class="main" style="margin-bottom:8px"><b>Tâche cochée</b><small>Comment reconnaître une tâche faite</small></div><div class="seg" style="display:flex">${[['strike','Barrée'],['hl','Surlignée'],['both','Les deux']].map(([k,l])=>`<button style="flex:1" class="${(st.doneStyle||'strike')===k?'on':''}" data-act="dstyle" data-v="${k}">${l}</button>`).join('')}</div></div>`)+`<h2>Nom de la classe</h2><input id="cn" value="${esc(S.className||'')}" placeholder="Nom de la classe" autocomplete="off">`;
+    <div class="setrow"><div class="main"><b>Apparence</b></div><div class="seg"><button class="${st.theme==='light'?'on':''}" data-act="th" data-v="light">Clair</button><button class="${st.theme==='dark'?'on':''}" data-act="th" data-v="dark">Sombre</button><button class="${st.theme==='auto'?'on':''}" data-act="th" data-v="auto">Auto</button></div></div><div class="setrow" style="display:block"><div class="main" style="margin-bottom:8px"><b>Tâches non faites</b><small>Que devient une tâche pas cochée le soir</small></div><div class="seg" style="display:flex">${[[true,'Reportée au jour suivant'],[false,'Reste en retard']].map(([k,l])=>`<button style="flex:1" class="${(st.rollover!==false)===k?'on':''}" data-act="rollset" data-v="${k}">${l}</button>`).join('')}</div></div><div class="setrow" style="display:block"><div class="main" style="margin-bottom:8px"><b>Tâche cochée</b><small>Comment reconnaître une tâche faite</small></div><div class="seg" style="display:flex">${[['strike','Barrée'],['hl','Surlignée'],['both','Les deux']].map(([k,l])=>`<button style="flex:1" class="${(st.doneStyle||'strike')===k?'on':''}" data-act="dstyle" data-v="${k}">${l}</button>`).join('')}</div></div>`)+`<h2>Nom de la classe</h2><input id="cn" value="${esc(S.className||'')}" placeholder="Nom de la classe" autocomplete="off">`;
   if(setTab==='subj')b=card(S.subjects.map(s=>`<div class="setrow"><button class="dotbtn" style="--c:${s.color}" data-act="pickColor" data-id="${s.id}" aria-label="Choisir la couleur"></button><input class="sname" data-sname="${s.id}" value="${esc(s.name)}" autocomplete="off"><button class="iconbtn" data-act="delSubject" data-id="${s.id}" aria-label="Supprimer">✕</button></div>`+(openColor===s.id?`<div class="setrow" style="display:block;background:var(--soft)"><div class="chips" style="gap:6px">${PICK.map(c=>`<button class="sw ${c.toLowerCase()===s.color.toLowerCase()?'on':''}" style="width:42px;height:42px" data-act="setColor" data-id="${s.id}" data-v="${c}" aria-label="${c}"><i style="background:${c};width:28px;height:28px"></i></button>`).join('')}</div><label style="display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--muted)">Autre couleur <input type="color" data-cust="${s.id}" value="${s.color.length===7?s.color:'#4F5BD5'}" style="width:56px;min-height:40px;padding:2px"></label></div>`:'')).join('')+`<div class="setrow"><button class="link" data-act="addSubject">+ Ajouter une matière</button></div>`)+'<p class="hint">Touche la pastille de couleur pour la changer.</p>';
   if(setTab==='fn')b=card(
     mod('agenda','Agenda','Semaine, mois, événements et dates limites')+
@@ -582,7 +583,7 @@ function vSettings(){
 }
 
 function render(){
-  swOpen=null;
+  swOpen=null;rollover();
   const m=S.settings.modules;
   if((view==='agenda'&&!m.agenda)||(view==='todo'&&!m.notes)||(view==='class'&&!m.class&&!m.ideas&&!m.infos&&!m.res&&!m.rec))view='today';
   $('#app').innerHTML={today:vToday,agenda:vAgenda,todo:vTodo,class:vClass,settings:vSettings}[view]();
@@ -769,7 +770,7 @@ const ACT={
   cmode:v=>{classMode=v;render()},
   settings:()=>setView('settings'),
   close:()=>closeSheet(),
-  toggle:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;n.doneAt=n.done?Date.now():0;persist();render()}},
+  toggle:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;n.doneAt=n.done?Date.now():0;n.doneDay=n.done?ymd(new Date()):'';persist();render()}},
   tday:v=>{tDay=v;render();window.scrollTo(0,0)},
   tshift:v=>{tDay=ymd(addDays(fromYmd(tDay),+v));render()},
   tfilter:v=>{fSubj=v;render()},
@@ -846,7 +847,7 @@ const ACT={
   addRec:()=>{const t=(($('#rt')||{}).value||'').trim();if(!t){toast('Écris la tâche d’abord');return}S.recurring.push({id:uid(),text:t,day:recDraft.day,subject:'',gen:[]});recDraft.text='';genRecurring();persist();render();toast('Tâche récurrente ajoutée')},
   delRec:(v,id)=>{S.recurring=S.recurring.filter(r=>r.id!==id);S.notes=S.notes.filter(n=>!(n.recId===id&&!n.done));persist();render()},
   delNote:(v,id)=>{S.notes=S.notes.filter(x=>x.id!==id);S.pupils.forEach(p=>{p.notes=p.notes.filter(x=>x.noteId!==id)});persist();sheet=null;render()},
-  doneNote:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;n.doneAt=n.done?Date.now():0;persist()}sheet=null;render()},
+  doneNote:(v,id)=>{const n=S.notes.find(x=>x.id===id);if(n){n.done=!n.done;n.doneAt=n.done?Date.now():0;n.doneDay=n.done?ymd(new Date()):'';persist()}sheet=null;render()},
   addEventDay:()=>openSheet({type:'event',d:{title:'',date:tDay,time:'',kind:'rdv'}}),
   addTask:()=>{const d=newDraft();applyDate(d,tDay);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
   dayAdd:v=>{const d=newDraft();applyDate(d,v);openSheet({type:'note',d});setTimeout(()=>{const c=$('#nt');c&&c.focus()},60)},
@@ -882,6 +883,7 @@ const ACT={
   saveTpl:()=>{const t=sheet.d;t.title=$('#tt').value.trim();t.text=$('#tx').value;if(!t.title||!t.text.trim()){toast('Titre et message d’abord');return}
     if(t.id){const i=S.templates.findIndex(x=>x.id===t.id);S.templates[i]={...t}}else S.templates.push({...t,id:uid()});persist();sheet=null;render();toast('Modèle enregistré')},
   delTpl:()=>{if(confirm('Supprimer ce modèle ?')){S.templates=S.templates.filter(x=>x.id!==sheet.d.id);persist();sheet=null;render()}},
+  rollset:v=>{S.settings.rollover=v==='true';persist();render()},
   dstyle:v=>{S.settings.doneStyle=v;applyTheme();persist();render()},
   accent:v=>{S.settings.accent=v;applyTheme();persist();render()},
   th:v=>{S.settings.theme=v;applyTheme();persist();render()},
